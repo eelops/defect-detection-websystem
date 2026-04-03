@@ -1,0 +1,121 @@
+html, body, #root {
+  margin: 0;
+  min-height: 100%;
+  background: #081018;
+}
+
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Noto Serif SC", sans-serif;
+  color: #f3f7fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.ant-menu-dark .ant-menu-item-selected {
+  background: linear-gradient(90deg, rgba(102, 217, 255, 0.22), rgba(102, 217, 255, 0.05)) !important;
+}
+
+.ant-menu-dark .ant-menu-item {
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.ant-card,
+.ant-table-wrapper,
+.ant-descriptions,
+.ant-statistic {
+  color: inherit;
+}
+
+.ant-card .ant-card-body,
+.ant-table-wrapper,
+.ant-table-container,
+.ant-table-content,
+.ant-table-content table,
+.ant-table-ping-right:not(.ant-table-has-fix-right) .ant-table-container::after,
+.ant-table-ping-left:not(.ant-table-has-fix-left) .ant-table-container::before {
+  background: transparent !important;
+}
+
+.ant-table {
+  background: transparent !important;
+}
+
+.ant-table-container table > thead > tr:first-child th {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #d8e8f6 !important;
+  border-bottom: 1px solid rgba(102, 217, 255, 0.1) !important;
+}
+
+.ant-table-tbody > tr > td,
+.ant-table-cell-fix-left,
+.ant-table-cell-fix-right {
+  background: transparent !important;
+  color: #eff7fe;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.ant-table-tbody > tr.ant-table-row:hover > td,
+.ant-table-tbody > tr:hover > .ant-table-cell-fix-left,
+.ant-table-tbody > tr:hover > .ant-table-cell-fix-right {
+  background: rgba(102, 217, 255, 0.05) !important;
+}
+
+.ant-pagination,
+.ant-pagination .ant-pagination-item,
+.ant-pagination .ant-pagination-prev,
+.ant-pagination .ant-pagination-next,
+.ant-pagination .ant-select-selector {
+  background: transparent !important;
+}
+
+.ant-pagination .ant-pagination-item a,
+.ant-pagination .ant-pagination-prev button,
+.ant-pagination .ant-pagination-next button,
+.ant-select-selection-item,
+.ant-select-arrow,
+.ant-select-clear,
+.ant-empty-description,
+.ant-descriptions-item-label,
+.ant-descriptions-item-content,
+.ant-form-item-label > label,
+.ant-select-selection-placeholder {
+  color: #dbe8f3 !important;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-textarea,
+.ant-select-selector,
+.ant-select-outlined:not(.ant-select-customize-input) .ant-select-selector {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(102, 217, 255, 0.18) !important;
+  color: #f3fbff !important;
+  box-shadow: none !important;
+}
+
+.ant-select-dropdown {
+  background: #0f1b27 !important;
+  border: 1px solid rgba(102, 217, 255, 0.14) !important;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35) !important;
+}
+
+.ant-select-item {
+  color: #dbe8f3 !important;
+}
+
+.ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background: rgba(102, 217, 255, 0.08) !important;
+}
+
+.ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background: rgba(102, 217, 255, 0.16) !important;
+  color: #f5fbff !important;
+}
+
+.ant-input::placeholder,
+.ant-input-textarea textarea::placeholder {
+  color: rgba(216, 232, 246, 0.45) !important;
+}

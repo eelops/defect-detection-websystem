@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-react-app:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(python:*)",
+      "Bash(where conda:*)",
+      "Bash(conda info:*)",
+      "Bash(go mod:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go run:*)",
+      "Bash(curl:*)",
+      "Bash(del:*)"
+    ]
+  }
+}
