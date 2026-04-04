@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
@@ -13,9 +13,9 @@ import {
 } from 'antd';
 import { AlertOutlined, InboxOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { createDefect } from '../api';
+import { createDefect, fetchDefectTypes, fetchEquipment, fetchProductionLines } from '../api';
 import { useAlerts } from '../context/AlertContext';
-import { defectTypes, severityOptions } from '../constants/defects';
+import { severityOptions } from '../constants/defects';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -32,9 +32,36 @@ export default function DefectCreatePage() {
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const { refreshAlerts } = useAlerts();
+  const selectedProductionLineId = Form.useWatch('production_line_id', form);
   const [fileList, setFileList] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [criticalAlert, setCriticalAlert] = useState(null);
+  const [masterDataLoading, setMasterDataLoading] = useState(true);
+  const [productionLines, setProductionLines] = useState([]);
+  const [equipmentList, setEquipmentList] = useState([]);
+  const [defectTypes, setDefectTypes] = useState([]);
+
+  useEffect(() => {
+    const loadMasterData = async () => {
+      setMasterDataLoading(true);
+      try {
+        const [lineResult, equipmentResult, defectTypeResult] = await Promise.all([
+          fetchProductionLines({ status: 'active' }),
+          fetchEquipment({ status: 'active' }),
+          fetchDefectTypes({ status: 'active' }),
+        ]);
+        setProductionLines(lineResult.items || []);
+        setEquipmentList(equipmentResult.items || []);
+        setDefectTypes(defectTypeResult.items || []);
+      } catch (error) {
+        message.error('基础数据加载失败');
+      } finally {
+        setMasterDataLoading(false);
+      }
+    };
+
+    loadMasterData();
+  }, []);
 
   const uploadProps = useMemo(() => ({
     multiple: false,
@@ -46,13 +73,48 @@ export default function DefectCreatePage() {
     listType: 'picture',
   }), [fileList]);
 
+  const productionLineOptions = useMemo(
+    () => productionLines.map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` })),
+    [productionLines]
+  );
+
+  const defectTypeOptions = useMemo(
+    () => defectTypes.map((item) => ({ value: item.id, label: `${item.code} · ${item.name}` })),
+    [defectTypes]
+  );
+
+  const equipmentOptions = useMemo(() => {
+    const filteredItems = selectedProductionLineId
+      ? equipmentList.filter((item) => item.production_line_id === selectedProductionLineId)
+      : equipmentList;
+
+    return filteredItems.map((item) => ({
+      value: item.id,
+      label: `${item.code} · ${item.name}`,
+    }));
+  }, [equipmentList, selectedProductionLineId]);
+
   const handleSubmit = async (values) => {
+    const selectedDefectType = defectTypes.find((item) => item.id === values.defect_type_id);
+    const selectedProductionLine = productionLines.find((item) => item.id === values.production_line_id);
+    const selectedEquipment = equipmentList.find((item) => item.id === values.equipment_id);
+
     const formData = new FormData();
     formData.append('name', values.name);
-    formData.append('defect_type', values.defect_type);
+    formData.append('defect_type', selectedDefectType?.name || '未分类');
     formData.append('severity', values.severity);
-    formData.append('location', values.location);
+    formData.append('location', values.location || '');
     formData.append('description', values.description || '');
+
+    if (values.defect_type_id) {
+      formData.append('defect_type_id', String(values.defect_type_id));
+    }
+    if (values.production_line_id) {
+      formData.append('production_line_id', String(values.production_line_id));
+    }
+    if (values.equipment_id) {
+      formData.append('equipment_id', String(values.equipment_id));
+    }
 
     if (fileList[0]?.originFileObj) {
       formData.append('image', fileList[0].originFileObj);
@@ -68,14 +130,16 @@ export default function DefectCreatePage() {
         setCriticalAlert({
           id: created.id,
           name: values.name,
-          defect_type: values.defect_type,
-          location: values.location,
+          defect_type: selectedDefectType?.name || '未分类',
+          production_line: selectedProductionLine?.name || '-',
+          equipment: selectedEquipment?.name || '-',
+          location: values.location || '-',
         });
       } else {
         navigate('/defects');
       }
     } catch (error) {
-      message.error('新增缺陷失败');
+      message.error(error?.response?.data?.detail || '新增缺陷失败');
     } finally {
       setSubmitting(false);
     }
@@ -101,16 +165,44 @@ export default function DefectCreatePage() {
                 <Input placeholder="例如：冲压面板边缘裂纹" />
               </Form.Item>
 
-              <Form.Item label="类型" name="defect_type" rules={[{ required: true, message: '请选择类型' }]}>
-                <Select placeholder="请选择缺陷类型" options={defectTypes.map((item) => ({ value: item, label: item }))} />
+              <Form.Item label="缺陷类型" name="defect_type_id" rules={[{ required: true, message: '请选择缺陷类型' }]}>
+                <Select
+                  placeholder="请选择缺陷类型"
+                  options={defectTypeOptions}
+                  loading={masterDataLoading}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
 
               <Form.Item label="等级" name="severity" rules={[{ required: true, message: '请选择等级' }]}>
                 <Select placeholder="请选择严重等级" options={severityOptions} />
               </Form.Item>
 
-              <Form.Item label="位置" name="location" rules={[{ required: true, message: '请输入位置' }]}>
-                <Input placeholder="例如：2号产线-A工位-外壳左侧" />
+              <Form.Item label="所属产线" name="production_line_id" rules={[{ required: true, message: '请选择所属产线' }]}>
+                <Select
+                  placeholder="请选择所属产线"
+                  options={productionLineOptions}
+                  loading={masterDataLoading}
+                  showSearch
+                  optionFilterProp="label"
+                  onChange={() => form.setFieldsValue({ equipment_id: undefined })}
+                />
+              </Form.Item>
+
+              <Form.Item label="设备" name="equipment_id">
+                <Select
+                  allowClear
+                  placeholder={selectedProductionLineId ? '请选择设备' : '可先选择产线后筛选设备'}
+                  options={equipmentOptions}
+                  loading={masterDataLoading}
+                  showSearch
+                  optionFilterProp="label"
+                />
+              </Form.Item>
+
+              <Form.Item label="位置" name="location">
+                <Input placeholder="例如：A工位-外壳左侧" />
               </Form.Item>
             </div>
 
@@ -163,6 +255,8 @@ export default function DefectCreatePage() {
             <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,120,117,0.25)', borderRadius: 24, padding: 28, textAlign: 'left' }}>
               <p><strong>缺陷标题：</strong>{criticalAlert.name}</p>
               <p><strong>缺陷类型：</strong>{criticalAlert.defect_type}</p>
+              <p><strong>所属产线：</strong>{criticalAlert.production_line}</p>
+              <p><strong>关联设备：</strong>{criticalAlert.equipment}</p>
               <p style={{ marginBottom: 0 }}><strong>缺陷位置：</strong>{criticalAlert.location}</p>
             </div>
             <Button

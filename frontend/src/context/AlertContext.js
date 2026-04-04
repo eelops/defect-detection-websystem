@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { fetchAlerts } from '../api';
+import { useAuth } from './AuthContext';
 
 const AlertContext = createContext(null);
 
@@ -54,6 +55,7 @@ function sendDesktopNotification(alert) {
 }
 
 export function AlertProvider({ children }) {
+  const { isAuthenticated } = useAuth();
   const [alerts, setAlerts] = useState([]);
   const previousCriticalIdsRef = useRef(new Set());
   const initializedRef = useRef(false);
@@ -70,6 +72,12 @@ export function AlertProvider({ children }) {
   }, []);
 
   const loadAlerts = useCallback(async () => {
+    if (!isAuthenticated) {
+      setAlerts([]);
+      previousCriticalIdsRef.current = new Set();
+      initializedRef.current = false;
+      return;
+    }
     try {
       const nextAlerts = await fetchAlerts();
       setAlerts(nextAlerts);
@@ -91,14 +99,18 @@ export function AlertProvider({ children }) {
     } catch (error) {
       console.error('轮询报警失败', error);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setAlerts([]);
+      return undefined;
+    }
     requestNotificationPermission();
     loadAlerts();
     const timer = window.setInterval(loadAlerts, 30000);
     return () => window.clearInterval(timer);
-  }, [loadAlerts, requestNotificationPermission]);
+  }, [isAuthenticated, loadAlerts, requestNotificationPermission]);
 
   const criticalAlerts = useMemo(
     () => alerts.filter((item) => item.severity === 'critical'),

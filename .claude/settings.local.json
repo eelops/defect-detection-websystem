@@ -12,7 +12,13 @@
       "Bash(go test:*)",
       "Bash(go run:*)",
       "Bash(curl:*)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(gofmt -w main.go main_test.go)",
+      "Bash(go get:*)",
+      "Bash(git:*)",
+      "Bash(go env:*)",
+      "Bash(go list:*)",
+      "Bash(grep -E \"^\\(simhei|simsun|msyh|msyhbd|STSONG|simfang|simkai\\)\\\\.\\(ttf|ttc|TTF|TTC\\)$\")"
     ]
   }
 }
