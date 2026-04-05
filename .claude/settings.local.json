@@ -18,7 +18,8 @@
       "Bash(git:*)",
       "Bash(go env:*)",
       "Bash(go list:*)",
-      "Bash(grep -E \"^\\(simhei|simsun|msyh|msyhbd|STSONG|simfang|simkai\\)\\\\.\\(ttf|ttc|TTF|TTC\\)$\")"
+      "Bash(grep -E \"^\\(simhei|simsun|msyh|msyhbd|STSONG|simfang|simkai\\)\\\\.\\(ttf|ttc|TTF|TTC\\)$\")",
+      "WebSearch"
     ]
   }
 }

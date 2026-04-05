@@ -147,11 +147,11 @@ export default function OperationLogsPage() {
       <Modal open={!!detailItem} title="日志详情" footer={null} onCancel={() => setDetailItem(null)} width={760} destroyOnHidden>
         {detailItem && (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            <Text>摘要：{detailItem.summary}</Text>
-            <Text>请求：{detailItem.request_method || '-'} {detailItem.request_path || '-'}</Text>
-            <Text>IP：{detailItem.ip_address || '-'}</Text>
-            <Text>User-Agent：{detailItem.user_agent || '-'}</Text>
-            <pre style={{ margin: 0, padding: 12, background: '#081018', color: '#d6e8f5', borderRadius: 12, overflow: 'auto' }}>{JSON.stringify(detailItem.details || {}, null, 2)}</pre>
+            <Text style={{ color: '#f3fbff' }}>摘要：{detailItem.summary}</Text>
+            <Text style={{ color: '#dbe8f3' }}>请求：{detailItem.request_method || '-'} {detailItem.request_path || '-'}</Text>
+            <Text style={{ color: '#dbe8f3' }}>IP：{detailItem.ip_address || '-'}</Text>
+            <Text style={{ color: '#dbe8f3' }}>User-Agent：{detailItem.user_agent || '-'}</Text>
+            <pre style={{ margin: 0, padding: 12, background: '#081018', color: '#d6e8f5', borderRadius: 12, overflow: 'auto', border: '1px solid rgba(102, 217, 255, 0.14)' }}>{JSON.stringify(detailItem.details || {}, null, 2)}</pre>
           </Space>
         )}
       </Modal>

@@ -12,7 +12,7 @@ import {
   Typography,
   message,
 } from 'antd';
-import { ApiOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ApiOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteDefect,
@@ -42,6 +42,18 @@ const cardStyle = {
   borderRadius: 20,
   boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
 };
+
+const sampleDefects = [
+  '冲压面板边缘裂纹 · 产线A · 严重',
+  '焊点虚焊偏移 · 产线B · 中等',
+  '涂层气泡不均 · 产线C · 轻微',
+];
+
+const demoAccounts = [
+  { role: '管理员', account: 'admin / Admin@123456' },
+  { role: '质检员示例', account: 'inspector1 / Inspector@123456' },
+  { role: '工人查看账号', account: 'viewer1 / Viewer@123456' },
+];
 
 const buildExcelFileName = () => {
   const today = new Date();
@@ -158,7 +170,7 @@ export default function DefectListPage() {
   }, [equipmentList, filters.production_line_id]);
 
   const columns = useMemo(() => {
-    const actionWidth = canDelete ? 220 : 160;
+    const actionWidth = canDelete ? 260 : 180;
     return [
       { title: 'ID', dataIndex: 'id', width: 80 },
       {
@@ -180,7 +192,7 @@ export default function DefectListPage() {
       {
         title: '状态',
         dataIndex: 'status',
-        width: 120,
+        width: 130,
         render: (value) => <Tag color={statusColorMap[value]}>{statusLabelMap[value] || value}</Tag>,
       },
       {
@@ -198,7 +210,7 @@ export default function DefectListPage() {
       {
         title: '位置',
         dataIndex: 'location',
-        width: 160,
+        width: 180,
         render: (value) => value || '-',
       },
       {
@@ -213,7 +225,7 @@ export default function DefectListPage() {
         width: actionWidth,
         fixed: 'right',
         render: (_, record) => (
-          <Space size="small">
+          <Space size="small" wrap>
             <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/defects/${record.id}`)}>查看详情</Button>
             {canEdit && <Button type="link" icon={<EditOutlined />} onClick={() => navigate(`/defects/${record.id}`)}>编辑</Button>}
             {canDelete && (
@@ -239,6 +251,38 @@ export default function DefectListPage() {
           {canEdit && <Button type="primary" onClick={() => navigate('/defects/new')}>新增缺陷</Button>}
         </Space>
       </div>
+
+      <Card style={cardStyle} styles={{ body: { padding: 20 } }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          <div>
+            <Space size={8} style={{ marginBottom: 10 }}>
+              <TeamOutlined style={{ color: '#66d9ff' }} />
+              <Text style={{ color: '#f5fbff', fontWeight: 600 }}>演示账号 / 工人账号</Text>
+            </Space>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              {demoAccounts.map((item) => (
+                <div key={item.role} style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(102, 217, 255, 0.1)' }}>
+                  <Text style={{ color: '#9cc7dc', display: 'block' }}>{item.role}</Text>
+                  <Text style={{ color: '#f5fbff' }}>{item.account}</Text>
+                </div>
+              ))}
+            </Space>
+          </div>
+          <div>
+            <Text style={{ color: '#f5fbff', fontWeight: 600, display: 'block', marginBottom: 10 }}>示例缺陷标题</Text>
+            <Space wrap>
+              {sampleDefects.map((item) => (
+                <Tag key={item} color="cyan" style={{ padding: '6px 10px', borderRadius: 999 }}>
+                  {item}
+                </Tag>
+              ))}
+            </Space>
+            <Text style={{ color: '#87a5bb', display: 'block', marginTop: 12 }}>
+              可直接参考这些示例创建演示数据，便于展示缺陷录入、处理、验收与关闭流程。
+            </Text>
+          </div>
+        </div>
+      </Card>
 
       <Alert
         type="info"
@@ -314,7 +358,7 @@ export default function DefectListPage() {
           columns={columns}
           dataSource={items}
           loading={loading}
-          scroll={{ x: 1820 }}
+          scroll={{ x: 1940 }}
           pagination={{
             current: pagination.current,
             pageSize: pagination.pageSize,

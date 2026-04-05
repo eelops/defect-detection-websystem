@@ -335,6 +335,18 @@ func newApp(databasePath, uploadPath string) (*App, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := app.ensureDemoUsers(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := app.ensureDemoMasterData(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := app.ensureDemoDefects(); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return app, nil
 }
 
@@ -1829,6 +1841,177 @@ func (app *App) ensureBootstrapAdmin() error {
 	return err
 }
 
+func (app *App) ensureDemoUsers() error {
+	demoUsers := []createUserRequest{
+		{Username: "inspector1", Password: "Inspector@123456", DisplayName: "质检员示例", Role: "inspector", IsActive: boolPtr(true)},
+		{Username: "viewer1", Password: "Viewer@123456", DisplayName: "工人查看账号", Role: "viewer", IsActive: boolPtr(true)},
+	}
+	for _, item := range demoUsers {
+		if _, _, err := app.findUserByUsername(item.Username); err == nil {
+			continue
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if _, err := app.createUser(item); err != nil {
+			return err
+		}
+		log.Printf("已初始化演示账号: %s", item.Username)
+	}
+	return nil
+}
+
+func (app *App) ensureDemoMasterData() error {
+	productionLineIDs := map[string]int64{}
+	for _, item := range []masterDataPayload{
+		{Code: "PL-A", Name: "产线A", Description: stringPtr("冲压主线"), Status: stringPtr("active")},
+		{Code: "PL-B", Name: "产线B", Description: stringPtr("焊接主线"), Status: stringPtr("active")},
+		{Code: "PL-C", Name: "产线C", Description: stringPtr("喷涂主线"), Status: stringPtr("active")},
+	} {
+		var id int64
+		err := app.db.QueryRow(`SELECT id FROM production_lines WHERE code = ? LIMIT 1`, item.Code).Scan(&id)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			created, err := app.createProductionLine(item)
+			if err != nil {
+				return err
+			}
+			id = created.ID
+		}
+		productionLineIDs[item.Code] = id
+	}
+
+	defectTypeIDs := map[string]int64{}
+	for _, item := range []defectTypePayload{
+		{Code: "DT-CRACK", Name: "裂纹", Description: stringPtr("金属或外壳裂纹类缺陷"), Severity: stringPtr("critical"), Status: stringPtr("active")},
+		{Code: "DT-WELD", Name: "焊接异常", Description: stringPtr("虚焊、偏焊等焊接类异常"), Severity: stringPtr("medium"), Status: stringPtr("active")},
+		{Code: "DT-SURFACE", Name: "表面瑕疵", Description: stringPtr("喷涂、气泡、划痕等外观异常"), Severity: stringPtr("low"), Status: stringPtr("active")},
+	} {
+		var id int64
+		err := app.db.QueryRow(`SELECT id FROM defect_types WHERE code = ? LIMIT 1`, item.Code).Scan(&id)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			created, err := app.createDefectType(item)
+			if err != nil {
+				return err
+			}
+			id = created.ID
+		}
+		defectTypeIDs[item.Code] = id
+	}
+
+	for _, item := range []equipmentPayload{
+		{Code: "EQ-A-01", Name: "冲压机1号", Description: stringPtr("产线A 冲压设备"), Status: stringPtr("active"), ProductionLineID: productionLineIDs["PL-A"], Model: stringPtr("JH21-160")},
+		{Code: "EQ-B-01", Name: "焊接机器人1号", Description: stringPtr("产线B 焊接设备"), Status: stringPtr("active"), ProductionLineID: productionLineIDs["PL-B"], Model: stringPtr("KR10 R1100")},
+		{Code: "EQ-C-01", Name: "喷涂机1号", Description: stringPtr("产线C 喷涂设备"), Status: stringPtr("active"), ProductionLineID: productionLineIDs["PL-C"], Model: stringPtr("PT-300")},
+	} {
+		var id int64
+		err := app.db.QueryRow(`SELECT id FROM equipment WHERE code = ? LIMIT 1`, item.Code).Scan(&id)
+		if err != nil {
+			if !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			if _, err := app.createEquipment(item); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (app *App) ensureDemoDefects() error {
+	lookupID := func(query string, arg string) (*int64, error) {
+		var id int64
+		if err := app.db.QueryRow(query, arg).Scan(&id); err != nil {
+			return nil, err
+		}
+		return &id, nil
+	}
+
+	crackTypeID, err := lookupID(`SELECT id FROM defect_types WHERE code = ? LIMIT 1`, "DT-CRACK")
+	if err != nil {
+		return err
+	}
+	weldTypeID, err := lookupID(`SELECT id FROM defect_types WHERE code = ? LIMIT 1`, "DT-WELD")
+	if err != nil {
+		return err
+	}
+	surfaceTypeID, err := lookupID(`SELECT id FROM defect_types WHERE code = ? LIMIT 1`, "DT-SURFACE")
+	if err != nil {
+		return err
+	}
+	lineAID, err := lookupID(`SELECT id FROM production_lines WHERE code = ? LIMIT 1`, "PL-A")
+	if err != nil {
+		return err
+	}
+	lineBID, err := lookupID(`SELECT id FROM production_lines WHERE code = ? LIMIT 1`, "PL-B")
+	if err != nil {
+		return err
+	}
+	lineCID, err := lookupID(`SELECT id FROM production_lines WHERE code = ? LIMIT 1`, "PL-C")
+	if err != nil {
+		return err
+	}
+	eqAID, err := lookupID(`SELECT id FROM equipment WHERE code = ? LIMIT 1`, "EQ-A-01")
+	if err != nil {
+		return err
+	}
+	eqBID, err := lookupID(`SELECT id FROM equipment WHERE code = ? LIMIT 1`, "EQ-B-01")
+	if err != nil {
+		return err
+	}
+	eqCID, err := lookupID(`SELECT id FROM equipment WHERE code = ? LIMIT 1`, "EQ-C-01")
+	if err != nil {
+		return err
+	}
+
+	demoDefects := []struct {
+		name             string
+		defectType       string
+		defectTypeID     *int64
+		severity         string
+		location         string
+		description      string
+		productionLineID *int64
+		equipmentID      *int64
+	}{
+		{name: "冲压面板边缘裂纹", defectType: "裂纹", defectTypeID: crackTypeID, severity: "critical", location: "产线A-工位3", description: "冲压后边缘区域发现连续裂纹，需立即停线复核。", productionLineID: lineAID, equipmentID: eqAID},
+		{name: "焊点虚焊偏移", defectType: "焊接异常", defectTypeID: weldTypeID, severity: "medium", location: "产线B-焊接区", description: "焊点存在虚焊和轻微偏移，建议复检并返工。", productionLineID: lineBID, equipmentID: eqBID},
+		{name: "涂层气泡不均", defectType: "表面瑕疵", defectTypeID: surfaceTypeID, severity: "low", location: "产线C-喷涂段", description: "表面出现零星气泡，影响外观一致性。", productionLineID: lineCID, equipmentID: eqCID},
+	}
+	createdCount := 0
+	for _, item := range demoDefects {
+		var id int64
+		err := app.db.QueryRow(`SELECT id FROM defects WHERE name = ? LIMIT 1`, item.name).Scan(&id)
+		if errors.Is(err, sql.ErrNoRows) {
+			created, err := app.insertDefect(item.name, item.defectType, item.severity, stringPtr(item.location), stringPtr(item.description), nil)
+			if err != nil {
+				return err
+			}
+			id = created.ID
+			createdCount++
+		} else if err != nil {
+			return err
+		}
+		_, err = app.db.Exec(`
+			UPDATE defects
+			SET defect_type = ?, defect_type_id = ?, production_line_id = ?, equipment_id = ?, severity = ?, status = 'open', location = ?, description = ?, updated_at = ?
+			WHERE id = ?
+		`, item.defectType, nullInt64Value(item.defectTypeID), nullInt64Value(item.productionLineID), nullInt64Value(item.equipmentID), item.severity, item.location, item.description, nowString(), id)
+		if err != nil {
+			return err
+		}
+	}
+	if createdCount > 0 {
+		log.Printf("已初始化 %d 条示例缺陷", createdCount)
+	}
+	return nil
+}
+
 func (app *App) createSession(userID int64, token string) error {
 	_, err := app.db.Exec(`
 		INSERT INTO sessions (user_id, token_hash, expires_at, created_at, last_used_at)
@@ -2124,6 +2307,10 @@ func nullTimePtr(value sql.NullString) *time.Time {
 	}
 	t := mustParseTime(value.String)
 	return &t
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func stringPtr(value string) *string {

@@ -123,7 +123,7 @@ export default function DefectCreatePage() {
     setSubmitting(true);
     try {
       const created = await createDefect(formData);
-      await refreshAlerts();
+      await refreshAlerts(values.severity === 'critical' ? { immediateNotify: true } : undefined);
       message.success('新增缺陷成功');
 
       if (values.severity === 'critical') {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Input } from 'antd';
 import MasterDataManagePage from '../components/MasterDataManagePage';
 import { createProductionLine, fetchProductionLines, updateProductionLine } from '../api';
 
@@ -11,7 +12,7 @@ export default function ProductionLineManagePage() {
         {
           name: 'description',
           label: '说明',
-          input: <textarea className="ant-input" rows={4} placeholder="请输入产线说明" />,
+          input: <Input.TextArea rows={4} placeholder="请输入产线说明" />,
           table: true,
           render: (value) => value || '-',
         },

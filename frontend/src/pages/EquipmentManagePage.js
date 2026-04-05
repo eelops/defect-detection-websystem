@@ -35,7 +35,7 @@ export default function EquipmentManagePage() {
         {
           name: 'description',
           label: '说明',
-          input: <textarea className="ant-input" rows={4} placeholder="请输入设备说明" />,
+          input: <Input.TextArea rows={4} placeholder="请输入设备说明" />,
         },
       ]}
       fetchList={fetchEquipment}

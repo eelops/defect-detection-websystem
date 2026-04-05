@@ -1,0 +1,7 @@
+.claude/
+__pycache__/
+backend/defects.db
+backend/uploads/
+backend/.env
+frontend/build/
+frontend/node_modules/

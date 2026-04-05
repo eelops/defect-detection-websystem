@@ -114,7 +114,7 @@ func TestLoginAndMeSuccess(t *testing.T) {
 
 func TestViewerCannotCreateOrDeleteDefects(t *testing.T) {
 	app := newTestApp(t)
-	viewer := createTestUser(t, app, "viewer1", "查看员", "viewer")
+	viewer := createTestUser(t, app, "viewer_seed_test", "查看员", "viewer")
 	seedDefect(t, app)
 
 	createResp := performRequest(t, app, http.MethodPost, "/api/defects", "", map[string]string{
@@ -135,7 +135,7 @@ func TestViewerCannotCreateOrDeleteDefects(t *testing.T) {
 
 func TestInspectorCanUpdateButCannotDeleteDefect(t *testing.T) {
 	app := newTestApp(t)
-	inspector := createTestUser(t, app, "inspector1", "质检员", "inspector")
+	inspector := createTestUser(t, app, "inspector_seed_test", "质检员", "inspector")
 	defect := seedDefect(t, app)
 
 	updateResp := performRequest(t, app, http.MethodPut, fmt.Sprintf("/api/defects/%d", defect.ID), `{"description":"已补充处理说明"}`, map[string]string{
@@ -180,7 +180,7 @@ func TestAdminCanManageUsers(t *testing.T) {
 
 func TestViewerCannotManageUsers(t *testing.T) {
 	app := newTestApp(t)
-	viewer := createTestUser(t, app, "viewer2", "查看员2", "viewer")
+	viewer := createTestUser(t, app, "viewer_manage_test", "查看员2", "viewer")
 	resp := performRequest(t, app, http.MethodGet, "/api/users", "", map[string]string{
 		"Authorization": bearerForUser(t, app, viewer.Username),
 	})
@@ -433,7 +433,7 @@ func TestChangePasswordSuccess(t *testing.T) {
 
 func TestDisabledUserCannotUseOldSession(t *testing.T) {
 	app := newTestApp(t)
-	user := createTestUser(t, app, "viewer3", "查看员3", "viewer")
+	user := createTestUser(t, app, "viewer_session_test", "查看员3", "viewer")
 	auth := bearerForUser(t, app, user.Username)
 	_, err := app.db.Exec(`UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?`, time.Now().Format(time.RFC3339), user.ID)
 	if err != nil {

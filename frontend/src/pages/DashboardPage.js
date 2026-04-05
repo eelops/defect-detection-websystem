@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Card, Col, Empty, Row, Space, Statistic, Typography, message } from 'antd';
-import { BugOutlined, FireOutlined, SafetyCertificateOutlined, DashboardOutlined } from '@ant-design/icons';
+import { Alert, Card, Col, Empty, Row, Space, Statistic, Typography, message } from 'antd';
+import { AlertOutlined, BugOutlined, FireOutlined, SafetyCertificateOutlined, DashboardOutlined } from '@ant-design/icons';
 import { Line, Pie } from '@ant-design/charts';
 import dayjs from 'dayjs';
 import { fetchDefects } from '../api';
-import { severityLabelMap, severityOptions } from '../constants/defects';
+import { severityLabelMap, severityOptions, statusLabelMap } from '../constants/defects';
 
 const { Title, Text } = Typography;
 
@@ -62,6 +62,11 @@ export default function DashboardPage() {
     return base;
   }, [items]);
 
+  const criticalOpenItems = useMemo(
+    () => items.filter((item) => item.severity === 'critical' && ['open', 'assigned', 'processing', 'pending_acceptance', 'rejected'].includes(item.status)),
+    [items]
+  );
+
   const pieData = useMemo(() => {
     const counter = new Map();
     items.forEach((item) => {
@@ -82,6 +87,29 @@ export default function DashboardPage() {
         <Text style={{ color: 'rgba(216, 232, 246, 0.72)' }}>汇总缺陷数量、风险等级分布与近 7 天趋势。</Text>
       </div>
 
+      {criticalOpenItems.length > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          icon={<AlertOutlined />}
+          message={<span style={{ color: '#fff1f0', fontWeight: 700 }}>当前存在 {criticalOpenItems.length} 条未关闭严重缺陷</span>}
+          description={(
+            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+              {criticalOpenItems.map((item) => (
+                <Text key={item.id} style={{ color: '#ffd8d6' }}>
+                  #{item.id} {item.name} ｜ {item.location || '位置未填写'} ｜ {statusLabelMap[item.status] || item.status}
+                </Text>
+              ))}
+            </Space>
+          )}
+          style={{
+            background: 'linear-gradient(180deg, rgba(84, 14, 19, 0.96) 0%, rgba(56, 10, 14, 0.94) 100%)',
+            border: '1px solid rgba(255, 120, 117, 0.3)',
+            borderRadius: 18,
+          }}
+        />
+      )}
+
       <Row gutter={[18, 18]}>
         <Col xs={24} md={12} xl={6}>
           <Card loading={loading} style={cardStyle} styles={{ body: { padding: 22 } }}>
@@ -100,7 +128,7 @@ export default function DashboardPage() {
         </Col>
         <Col xs={24} md={12} xl={6}>
           <Card loading={loading} style={cardStyle} styles={{ body: { padding: 22 } }}>
-            <Statistic title={<span style={{ color: '#89a8bf' }}>已解决缺陷</span>} value={items.filter((item) => item.status === 'resolved').length} prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />} valueStyle={{ color: '#f6ffed' }} />
+            <Statistic title={<span style={{ color: '#89a8bf' }}>已解决缺陷</span>} value={items.filter((item) => item.status === 'closed').length} prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />} valueStyle={{ color: '#f6ffed' }} />
           </Card>
         </Col>
       </Row>

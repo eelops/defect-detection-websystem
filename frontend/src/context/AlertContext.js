@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { message, notification } from 'antd';
 import { fetchAlerts } from '../api';
 import { useAuth } from './AuthContext';
 
@@ -40,18 +41,35 @@ function sendDesktopNotification(alert) {
     return;
   }
 
-  const notification = new Notification('新的严重缺陷告警', {
+  const notificationInstance = new Notification('新的严重缺陷告警', {
     body: `${alert.name}｜${alert.defect_type}｜${alert.location || '位置未填写'}`,
     tag: `critical-defect-${alert.id}`,
     requireInteraction: true,
   });
 
-  notification.onclick = () => {
+  notificationInstance.onclick = () => {
     window.focus();
     window.location.hash = '';
     window.location.href = `/defects/${alert.id}`;
-    notification.close();
+    notificationInstance.close();
   };
+}
+
+function notifyCriticalAlerts(alerts, isImmediate = false) {
+  if (!alerts.length) {
+    return;
+  }
+  playAlertSound();
+  alerts.forEach((alert) => {
+    sendDesktopNotification(alert);
+    notification.error({
+      message: isImmediate ? '严重缺陷已创建' : '新的严重缺陷告警',
+      description: `${alert.name}｜${alert.defect_type}｜${alert.location || '位置未填写'}`,
+      duration: 0,
+      placement: 'topRight',
+    });
+  });
+  message.error(`当前有 ${alerts.length} 条严重缺陷待处理`);
 }
 
 export function AlertProvider({ children }) {
@@ -71,12 +89,12 @@ export function AlertProvider({ children }) {
     }
   }, []);
 
-  const loadAlerts = useCallback(async () => {
+  const loadAlerts = useCallback(async (options = {}) => {
     if (!isAuthenticated) {
       setAlerts([]);
       previousCriticalIdsRef.current = new Set();
       initializedRef.current = false;
-      return;
+      return [];
     }
     try {
       const nextAlerts = await fetchAlerts();
@@ -85,19 +103,22 @@ export function AlertProvider({ children }) {
       const criticalAlerts = nextAlerts.filter((item) => item.severity === 'critical');
       const nextCriticalIds = new Set(criticalAlerts.map((item) => item.id));
 
-      if (initializedRef.current) {
+      if (options.immediateNotify) {
+        notifyCriticalAlerts(criticalAlerts, true);
+      } else if (initializedRef.current) {
         const newCriticalAlerts = criticalAlerts.filter((item) => !previousCriticalIdsRef.current.has(item.id));
         if (newCriticalAlerts.length > 0) {
-          playAlertSound();
-          newCriticalAlerts.forEach(sendDesktopNotification);
+          notifyCriticalAlerts(newCriticalAlerts);
         }
       } else {
         initializedRef.current = true;
       }
 
       previousCriticalIdsRef.current = nextCriticalIds;
+      return nextAlerts;
     } catch (error) {
       console.error('轮询报警失败', error);
+      return [];
     }
   }, [isAuthenticated]);
 
@@ -108,7 +129,7 @@ export function AlertProvider({ children }) {
     }
     requestNotificationPermission();
     loadAlerts();
-    const timer = window.setInterval(loadAlerts, 30000);
+    const timer = window.setInterval(() => loadAlerts(), 30000);
     return () => window.clearInterval(timer);
   }, [isAuthenticated, loadAlerts, requestNotificationPermission]);
 
@@ -117,14 +138,19 @@ export function AlertProvider({ children }) {
     [alerts]
   );
 
+  const refreshAlerts = useCallback(
+    (options) => loadAlerts(options),
+    [loadAlerts]
+  );
+
   const contextValue = useMemo(
     () => ({
       alerts,
       criticalAlerts,
       criticalCount: criticalAlerts.length,
-      refreshAlerts: loadAlerts,
+      refreshAlerts,
     }),
-    [alerts, criticalAlerts, loadAlerts]
+    [alerts, criticalAlerts, refreshAlerts]
   );
 
   return <AlertContext.Provider value={contextValue}>{children}</AlertContext.Provider>;

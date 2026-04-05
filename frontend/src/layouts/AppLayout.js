@@ -219,6 +219,8 @@ export default function AppLayout() {
               <Space direction="vertical" size={2}>
                 <Text style={{ color: '#f5fbff', fontWeight: 600 }}>演示登录信息</Text>
                 <Text style={{ color: '#cfe0ec' }}>默认管理员账号：admin / Admin@123456</Text>
+                <Text style={{ color: '#cfe0ec' }}>质检员示例账号：inspector1 / Inspector@123456</Text>
+                <Text style={{ color: '#cfe0ec' }}>工人查看账号：viewer1 / Viewer@123456</Text>
                 <Text style={{ color: '#87a5bb' }}>登录后可在右上角“修改密码”，管理员可维护用户、日志与基础数据。</Text>
               </Space>
             </Card>
