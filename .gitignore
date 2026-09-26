@@ -1,7 +1,32 @@
+# Local tools and instructions
 .claude/
+.codex-run/
+/AGENTS.md
+/CLAUDE.md
+
+# Dependencies, caches and build output
+node_modules/
 __pycache__/
-backend/defects.db
-backend/uploads/
-backend/.env
+*.py[cod]
+backend/.gocache/
 frontend/build/
-frontend/node_modules/
+coverage/
+*.log
+
+# Local configuration and runtime data
+.env
+.env.*
+!.env.example
+backend/*.db
+backend/*.db-*
+backend/uploads/
+
+# Copyright registration and generated explanatory documents
+/软著/
+/软著*
+/开源代码与组件使用情况说明.*
+/generate_docx.js
+/generate_manual_docx.js
+/generate_opensource_docx.js
+/generate_report_docx.js
+/generate_source_docx.js
