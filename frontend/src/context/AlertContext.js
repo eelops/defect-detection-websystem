@@ -75,6 +75,7 @@ function notifyCriticalAlerts(alerts, isImmediate = false) {
 export function AlertProvider({ children }) {
   const { isAuthenticated } = useAuth();
   const [alerts, setAlerts] = useState([]);
+  const [alertError, setAlertError] = useState('');
   const previousCriticalIdsRef = useRef(new Set());
   const initializedRef = useRef(false);
 
@@ -92,12 +93,14 @@ export function AlertProvider({ children }) {
   const loadAlerts = useCallback(async (options = {}) => {
     if (!isAuthenticated) {
       setAlerts([]);
+      setAlertError('');
       previousCriticalIdsRef.current = new Set();
       initializedRef.current = false;
       return [];
     }
     try {
       const nextAlerts = await fetchAlerts();
+      setAlertError('');
       setAlerts(nextAlerts);
 
       const criticalAlerts = nextAlerts.filter((item) => item.severity === 'critical');
@@ -112,12 +115,16 @@ export function AlertProvider({ children }) {
         }
       } else {
         initializedRef.current = true;
+        if (criticalAlerts.length > 0) {
+          notifyCriticalAlerts(criticalAlerts);
+        }
       }
 
       previousCriticalIdsRef.current = nextCriticalIds;
       return nextAlerts;
     } catch (error) {
       console.error('轮询报警失败', error);
+      setAlertError('告警数据加载失败，请检查后端服务或稍后刷新');
       return [];
     }
   }, [isAuthenticated]);
@@ -125,6 +132,7 @@ export function AlertProvider({ children }) {
   useEffect(() => {
     if (!isAuthenticated) {
       setAlerts([]);
+      setAlertError('');
       return undefined;
     }
     requestNotificationPermission();
@@ -148,9 +156,10 @@ export function AlertProvider({ children }) {
       alerts,
       criticalAlerts,
       criticalCount: criticalAlerts.length,
+      alertError,
       refreshAlerts,
     }),
-    [alerts, criticalAlerts, refreshAlerts]
+    [alerts, criticalAlerts, alertError, refreshAlerts]
   );
 
   return <AlertContext.Provider value={contextValue}>{children}</AlertContext.Provider>;

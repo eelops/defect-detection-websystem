@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Button,
   Card,
@@ -24,13 +24,6 @@ const roleOptions = [
   { value: 'inspector', label: '质检员' },
   { value: 'viewer', label: '查看员' },
 ];
-
-const cardStyle = {
-  background: 'linear-gradient(180deg, rgba(11, 26, 40, 0.96) 0%, rgba(16, 34, 51, 0.92) 100%)',
-  border: '1px solid rgba(102, 217, 255, 0.14)',
-  borderRadius: 20,
-  boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
-};
 
 export default function UserManagementPage() {
   const [items, setItems] = useState([]);
@@ -112,7 +105,7 @@ export default function UserManagementPage() {
     }
   };
 
-  const columns = useMemo(() => ([
+  const columns = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: '用户名', dataIndex: 'username', width: 140 },
     { title: '显示名称', dataIndex: 'display_name', width: 160 },
@@ -150,19 +143,19 @@ export default function UserManagementPage() {
         </Space>
       ),
     },
-  ]), []);
+  ];
 
   return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <Title level={2} style={{ color: '#f5fbff', margin: 0, fontFamily: 'Georgia, "Times New Roman", serif' }}>用户管理</Title>
-          <Text style={{ color: 'rgba(216, 232, 246, 0.72)' }}>维护系统账号、角色权限和启用状态。</Text>
+    <Space direction="vertical" size={20} className="page-stack">
+      <div className="page-header">
+        <div className="page-heading">
+          <Title level={2} className="page-heading-title">用户管理</Title>
+          <Text className="page-heading-subtitle">维护系统账号、角色权限和启用状态。</Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>新增用户</Button>
       </div>
 
-      <Card style={cardStyle} styles={{ body: { padding: 8 } }}>
+      <Card className="content-card table-card">
         <Table
           rowKey="id"
           columns={columns}

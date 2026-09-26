@@ -4,13 +4,6 @@ import { ReloadOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
-const cardStyle = {
-  background: 'linear-gradient(180deg, rgba(11, 26, 40, 0.96) 0%, rgba(16, 34, 51, 0.92) 100%)',
-  border: '1px solid rgba(102, 217, 255, 0.14)',
-  borderRadius: 20,
-  boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
-};
-
 const statusOptions = [
   { value: 'active', label: '启用' },
   { value: 'inactive', label: '停用' },
@@ -103,26 +96,26 @@ export default function MasterDataManagePage({
   };
 
   return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <Title level={2} style={{ color: '#f5fbff', margin: 0, fontFamily: 'Georgia, "Times New Roman", serif' }}>{title}</Title>
-          <Text style={{ color: 'rgba(216, 232, 246, 0.72)' }}>{subtitle}</Text>
+    <Space direction="vertical" size={20} className="page-stack">
+      <div className="page-header">
+        <div className="page-heading">
+          <Title level={2} className="page-heading-title">{title}</Title>
+          <Text className="page-heading-subtitle">{subtitle}</Text>
         </div>
         <Button type="primary" onClick={() => { setEditing(null); form.setFieldsValue({ status: 'active' }); setOpen(true); }}>新增</Button>
       </div>
 
-      <Card style={cardStyle} styles={{ body: { padding: 20 } }}>
-        <Space wrap size={12} style={{ width: '100%', justifyContent: 'space-between' }}>
-          <Space wrap size={12}>
+      <Card className="toolbar-card">
+        <div className="filter-grid">
+          <div className="filter-controls">
             <Input placeholder="按编码/名称搜索" style={{ width: 240 }} value={keyword} onChange={(e) => setKeyword(e.target.value)} />
             <Select allowClear placeholder="按状态筛选" style={{ width: 160 }} options={statusOptions} value={status} onChange={setStatus} />
-          </Space>
+          </div>
           <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
-        </Space>
+        </div>
       </Card>
 
-      <Card style={cardStyle} styles={{ body: { padding: 8 } }}>
+      <Card className="content-card table-card">
         <Table rowKey="id" columns={columns} dataSource={items} loading={loading} pagination={{ pageSize: 10, showSizeChanger: false }} />
       </Card>
 

@@ -141,9 +141,9 @@ type DefectUpdate struct {
 }
 
 type DefectActionRequest struct {
-	Action            string `json:"action"`
-	AssigneeID        *int64 `json:"assignee_id"`
-	AcceptorID        *int64 `json:"acceptor_id"`
+	Action            string  `json:"action"`
+	AssigneeID        *int64  `json:"assignee_id"`
+	AcceptorID        *int64  `json:"acceptor_id"`
 	ProcessResult     *string `json:"process_result"`
 	AcceptanceComment *string `json:"acceptance_comment"`
 	Comment           *string `json:"comment"`
@@ -163,13 +163,13 @@ type DefectFlowLog struct {
 }
 
 type MasterDataItem struct {
-	ID          int64      `json:"id"`
-	Code        string     `json:"code"`
-	Name        string     `json:"name"`
-	Description *string    `json:"description,omitempty"`
-	Status      string     `json:"status"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          int64     `json:"id"`
+	Code        string    `json:"code"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description,omitempty"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type ProductionLine struct {
@@ -298,6 +298,10 @@ type operationLogEntry struct {
 	Details    map[string]any
 }
 
+type sqlExecer interface {
+	Exec(query string, args ...any) (sql.Result, error)
+}
+
 func main() {
 	if err := loadEnvFile(".env"); err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Fatalf("load .env: %v", err)
@@ -358,6 +362,7 @@ func (app *App) routes() http.Handler {
 	mux.HandleFunc("/api/auth/logout", app.withCORS(app.withAuth(app.handleLogout)))
 	mux.HandleFunc("/api/auth/me", app.withCORS(app.withAuth(app.handleMe)))
 	mux.HandleFunc("/api/auth/password", app.withCORS(app.withAuth(app.handleChangePassword)))
+	mux.HandleFunc("/api/users/assignable", app.withCORS(app.withAuth(app.requireRoles(app.handleAssignableUsers, "admin", "inspector", "viewer"))))
 	mux.HandleFunc("/api/users", app.withCORS(app.withAuth(app.requireRoles(app.handleUsers, "admin"))))
 	mux.HandleFunc("/api/users/", app.withCORS(app.withAuth(app.requireRoles(app.handleUserByID, "admin"))))
 	mux.HandleFunc("/api/operation-logs", app.withCORS(app.withAuth(app.requireRoles(app.handleOperationLogs, "admin"))))
@@ -650,6 +655,20 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "密码修改成功"})
 }
 
+func (app *App) handleAssignableUsers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "不支持的请求方法")
+		return
+	}
+
+	users, err := app.listAssignableInspectors()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "查询可指派人员失败")
+		return
+	}
+	writeJSON(w, http.StatusOK, users)
+}
+
 func (app *App) handleUsers(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -825,7 +844,6 @@ func (app *App) handleDefectByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func (app *App) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeError(w, http.StatusMethodNotAllowed, "不支持的请求方法")
@@ -833,12 +851,17 @@ func (app *App) handleAlerts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := app.db.Query(`
-		SELECT id, name, defect_type, severity, status, location, description, image_path,
-			assignee_id, assignee_name, acceptor_id, acceptor_name, assigned_at, processed_at, accepted_at, closed_at,
-			process_result, acceptance_comment, created_at, updated_at
-		FROM defects
-		WHERE status IN ('open', 'assigned', 'processing', 'pending_acceptance', 'rejected') AND severity IN ('high', 'critical')
-		ORDER BY datetime(created_at) DESC, id DESC
+		SELECT d.id, d.name, COALESCE(dt.name, d.defect_type) AS defect_type, d.defect_type_id, d.severity, d.status,
+			d.location, d.production_line_id, pl.name AS production_line_name, d.equipment_id, eq.name AS equipment_name,
+			d.description, d.image_path,
+			d.assignee_id, d.assignee_name, d.acceptor_id, d.acceptor_name, d.assigned_at, d.processed_at, d.accepted_at, d.closed_at,
+			d.process_result, d.acceptance_comment, d.created_at, d.updated_at
+		FROM defects d
+		LEFT JOIN defect_types dt ON dt.id = d.defect_type_id
+		LEFT JOIN production_lines pl ON pl.id = d.production_line_id
+		LEFT JOIN equipment eq ON eq.id = d.equipment_id
+		WHERE d.status IN ('open', 'assigned', 'processing', 'pending_acceptance', 'rejected') AND d.severity = 'critical'
+		ORDER BY datetime(d.created_at) DESC, d.id DESC
 	`)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "查询报警失败")
@@ -1234,7 +1257,6 @@ func statusLabelForExport(value string) string {
 	return value
 }
 
-
 func (app *App) getDefect(w http.ResponseWriter, r *http.Request, id int64) {
 	defect, err := app.findDefect(id)
 	if err != nil {
@@ -1468,7 +1490,7 @@ func migrate(db *sql.DB) error {
 				created_at TEXT NOT NULL,
 				updated_at TEXT NOT NULL
 			)`,
-			`CREATE TABLE IF NOT EXISTS equipment (
+		`CREATE TABLE IF NOT EXISTS equipment (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				code TEXT NOT NULL UNIQUE,
 				name TEXT NOT NULL,
@@ -1480,7 +1502,7 @@ func migrate(db *sql.DB) error {
 				updated_at TEXT NOT NULL,
 				FOREIGN KEY (production_line_id) REFERENCES production_lines(id)
 			)`,
-			`CREATE TABLE IF NOT EXISTS defect_types (
+		`CREATE TABLE IF NOT EXISTS defect_types (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				code TEXT NOT NULL UNIQUE,
 				name TEXT NOT NULL,
@@ -1490,7 +1512,7 @@ func migrate(db *sql.DB) error {
 				created_at TEXT NOT NULL,
 				updated_at TEXT NOT NULL
 			)`,
-			`CREATE TABLE IF NOT EXISTS operation_logs (
+		`CREATE TABLE IF NOT EXISTS operation_logs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			actor_user_id INTEGER,
 			actor_username TEXT,
@@ -1547,9 +1569,9 @@ func migrate(db *sql.DB) error {
 		{"closed_at", "ALTER TABLE defects ADD COLUMN closed_at TEXT"},
 		{"process_result", "ALTER TABLE defects ADD COLUMN process_result TEXT"},
 		{"acceptance_comment", "ALTER TABLE defects ADD COLUMN acceptance_comment TEXT"},
-			{"defect_type_id", "ALTER TABLE defects ADD COLUMN defect_type_id INTEGER"},
-			{"production_line_id", "ALTER TABLE defects ADD COLUMN production_line_id INTEGER"},
-			{"equipment_id", "ALTER TABLE defects ADD COLUMN equipment_id INTEGER"},
+		{"defect_type_id", "ALTER TABLE defects ADD COLUMN defect_type_id INTEGER"},
+		{"production_line_id", "ALTER TABLE defects ADD COLUMN production_line_id INTEGER"},
+		{"equipment_id", "ALTER TABLE defects ADD COLUMN equipment_id INTEGER"},
 	} {
 		if err := ensureColumn(db, "defects", column.name, column.alter); err != nil {
 			return err
@@ -1709,6 +1731,28 @@ func (app *App) listUsers() ([]User, error) {
 	rows, err := app.db.Query(`
 		SELECT id, username, password_hash, display_name, role, is_active, last_login_at, created_at, updated_at
 		FROM users ORDER BY id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var users []User
+	for rows.Next() {
+		user, _, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, *user)
+	}
+	return users, rows.Err()
+}
+
+func (app *App) listAssignableInspectors() ([]User, error) {
+	rows, err := app.db.Query(`
+		SELECT id, username, password_hash, display_name, role, is_active, last_login_at, created_at, updated_at
+		FROM users
+		WHERE role = 'inspector' AND is_active = 1
+		ORDER BY display_name ASC, username ASC
 	`)
 	if err != nil {
 		return nil, err
@@ -2609,7 +2653,6 @@ func clientIP(r *http.Request) string {
 	return remoteAddr
 }
 
-
 func scanDefectFlowLogs(rows *sql.Rows) ([]DefectFlowLog, error) {
 	items := []DefectFlowLog{}
 	for rows.Next() {
@@ -2701,25 +2744,41 @@ func (app *App) applyDefectAction(user *User, id int64, payload DefectActionRequ
 		if payload.AssigneeID == nil {
 			return nil, errors.New("请选择处理人")
 		}
-		assignee, err := app.findUser(*payload.AssigneeID)
+		if payload.AcceptorID == nil {
+			return nil, errors.New("请选择验收人")
+		}
+		assignee, err := app.findActiveInspector(*payload.AssigneeID, "处理人")
 		if err != nil {
-			return nil, errors.New("处理人不存在")
+			return nil, err
+		}
+		acceptor, err := app.findActiveInspector(*payload.AcceptorID, "验收人")
+		if err != nil {
+			return nil, err
 		}
 		assigneeID = int64Ptr(assignee.ID)
 		assigneeName = stringPtr(assignee.DisplayName)
-		if payload.AcceptorID != nil {
-			acceptor, err := app.findUser(*payload.AcceptorID)
-			if err != nil {
-				return nil, errors.New("验收人不存在")
-			}
-			acceptorID = int64Ptr(acceptor.ID)
-			acceptorName = stringPtr(acceptor.DisplayName)
-		}
+		acceptorID = int64Ptr(acceptor.ID)
+		acceptorName = stringPtr(acceptor.DisplayName)
 		assignedAt = now
 		processedAt = ""
 		acceptedAt = ""
 		closedAt = ""
+		processResult = ""
+		acceptanceComment = ""
+	case "start_process":
+		if err := app.validateDefectParticipant(defect.AssigneeID, "处理人"); err != nil {
+			return nil, err
+		}
+		if err := app.validateDefectParticipant(defect.AcceptorID, "验收人"); err != nil {
+			return nil, err
+		}
 	case "submit_for_acceptance":
+		if err := app.validateDefectParticipant(defect.AssigneeID, "处理人"); err != nil {
+			return nil, err
+		}
+		if err := app.validateDefectParticipant(defect.AcceptorID, "验收人"); err != nil {
+			return nil, err
+		}
 		result := strings.TrimSpace(ptrValue(payload.ProcessResult))
 		if result == "" {
 			return nil, errors.New("请填写处理结果")
@@ -2727,9 +2786,15 @@ func (app *App) applyDefectAction(user *User, id int64, payload DefectActionRequ
 		processResult = result
 		processedAt = now
 	case "accept":
+		if err := app.validateDefectParticipant(defect.AcceptorID, "验收人"); err != nil {
+			return nil, err
+		}
 		acceptedAt = now
 		acceptanceComment = strings.TrimSpace(ptrValue(payload.AcceptanceComment))
 	case "reject":
+		if err := app.validateDefectParticipant(defect.AcceptorID, "验收人"); err != nil {
+			return nil, err
+		}
 		feedback := strings.TrimSpace(ptrValue(payload.AcceptanceComment))
 		if feedback == "" {
 			return nil, errors.New("请填写退回原因")
@@ -2740,7 +2805,13 @@ func (app *App) applyDefectAction(user *User, id int64, payload DefectActionRequ
 		closedAt = now
 	}
 
-	_, err = app.db.Exec(`
+	tx, err := app.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
 		UPDATE defects
 		SET status = ?, assignee_id = ?, assignee_name = ?, acceptor_id = ?, acceptor_name = ?,
 			assigned_at = ?, processed_at = ?, accepted_at = ?, closed_at = ?, process_result = ?, acceptance_comment = ?, updated_at = ?
@@ -2750,17 +2821,46 @@ func (app *App) applyDefectAction(user *User, id int64, payload DefectActionRequ
 		return nil, err
 	}
 	comment := firstNonEmpty(strings.TrimSpace(ptrValue(payload.Comment)), strings.TrimSpace(ptrValue(payload.AcceptanceComment)), strings.TrimSpace(ptrValue(payload.ProcessResult)))
-	if err := app.insertDefectFlowLog(id, action, defect.Status, nextStatus, user, nullableString(comment)); err != nil {
+	if err := insertDefectFlowLogWith(tx, id, action, defect.Status, nextStatus, user, nullableString(comment)); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return app.findDefect(id)
 }
 
 func (app *App) insertDefectFlowLog(defectID int64, action, fromStatus, toStatus string, user *User, comment *string) error {
-	_, err := app.db.Exec(`
+	return insertDefectFlowLogWith(app.db, defectID, action, fromStatus, toStatus, user, comment)
+}
+
+func insertDefectFlowLogWith(exec sqlExecer, defectID int64, action, fromStatus, toStatus string, user *User, comment *string) error {
+	_, err := exec.Exec(`
 		INSERT INTO defect_flow_logs (defect_id, action, from_status, to_status, operator_id, operator_name, operator_role, comment, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, defectID, action, fromStatus, toStatus, user.ID, userDisplayName(user), user.Role, ptrValue(comment), nowString())
+	return err
+}
+
+func (app *App) findActiveInspector(id int64, fieldName string) (*User, error) {
+	user, err := app.findUser(id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%s不存在", fieldName)
+		}
+		return nil, err
+	}
+	if user.Role != "inspector" || !user.IsActive {
+		return nil, fmt.Errorf("%s必须是启用的质检员", fieldName)
+	}
+	return user, nil
+}
+
+func (app *App) validateDefectParticipant(id *int64, fieldName string) error {
+	if id == nil {
+		return fmt.Errorf("缺少%s，请先重新指派", fieldName)
+	}
+	_, err := app.findActiveInspector(*id, fieldName)
 	return err
 }
 

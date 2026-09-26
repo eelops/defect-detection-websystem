@@ -21,13 +21,6 @@ const { Title, Text } = Typography;
 const { TextArea } = Input;
 const { Dragger } = Upload;
 
-const cardStyle = {
-  background: 'linear-gradient(180deg, rgba(11, 26, 40, 0.96) 0%, rgba(16, 34, 51, 0.92) 100%)',
-  border: '1px solid rgba(102, 217, 255, 0.14)',
-  borderRadius: 20,
-  boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
-};
-
 export default function DefectCreatePage() {
   const [form] = Form.useForm();
   const navigate = useNavigate();
@@ -147,20 +140,22 @@ export default function DefectCreatePage() {
 
   return (
     <>
-      <Space direction="vertical" size={24} style={{ width: '100%' }}>
-        <div>
-          <Title level={2} style={{ color: '#f5fbff', margin: 0, fontFamily: 'Georgia, "Times New Roman", serif' }}>新增缺陷</Title>
-          <Text style={{ color: 'rgba(216, 232, 246, 0.72)' }}>录入现场缺陷信息，并上传图像作为检测依据。</Text>
+      <Space direction="vertical" size={20} className="page-stack">
+        <div className="page-header">
+          <div className="page-heading">
+            <Title level={2} className="page-heading-title">新增缺陷</Title>
+            <Text className="page-heading-subtitle">录入现场缺陷信息，并上传图像作为检测依据。</Text>
+          </div>
         </div>
 
-        <Card style={cardStyle} styles={{ body: { padding: 24 } }}>
+        <Card className="content-card" styles={{ body: { padding: 24 } }}>
           <Form
             form={form}
             layout="vertical"
             initialValues={{ severity: 'medium' }}
             onFinish={handleSubmit}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 18 }}>
+            <div className="form-grid">
               <Form.Item label="标题" name="name" rules={[{ required: true, message: '请输入标题' }]}>
                 <Input placeholder="例如：冲压面板边缘裂纹" />
               </Form.Item>
@@ -211,12 +206,12 @@ export default function DefectCreatePage() {
             </Form.Item>
 
             <Form.Item label="图片上传">
-              <Dragger {...uploadProps} style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(102, 217, 255, 0.3)', borderRadius: 18, padding: '18px 0' }}>
+              <Dragger {...uploadProps} style={{ padding: '18px 0' }}>
                 <p className="ant-upload-drag-icon">
-                  <InboxOutlined style={{ color: '#66d9ff' }} />
+                  <InboxOutlined style={{ color: '#2563eb' }} />
                 </p>
-                <p style={{ color: '#f0f7fd', fontSize: 16, marginBottom: 4 }}>拖拽图片到此处，或点击上传</p>
-                <p style={{ color: 'rgba(216, 232, 246, 0.64)', margin: 0 }}>支持单张图片预览，提交时统一上传到后端</p>
+                <p style={{ color: '#1f2937', fontSize: 16, marginBottom: 4 }}>拖拽图片到此处，或点击上传</p>
+                <p style={{ color: '#667085', margin: 0 }}>支持单张图片预览，提交时统一上传到后端</p>
               </Dragger>
             </Form.Item>
 
@@ -237,7 +232,7 @@ export default function DefectCreatePage() {
         styles={{
           content: {
             minHeight: '100vh',
-            background: 'radial-gradient(circle at top, rgba(255,77,79,0.24), rgba(43,10,10,0.98) 42%, rgba(18,3,3,1) 100%)',
+            background: '#7f1d1d',
             borderRadius: 0,
             padding: 0,
           },
@@ -246,13 +241,13 @@ export default function DefectCreatePage() {
         }}
       >
         {criticalAlert && (
-          <div style={{ maxWidth: 720, width: '100%', textAlign: 'center', color: '#fff1f0' }}>
+          <div className="critical-alert-content">
             <AlertOutlined style={{ fontSize: 72, color: '#ff7875', marginBottom: 20 }} />
             <div style={{ fontSize: 18, letterSpacing: 6, color: '#ffccc7', marginBottom: 12 }}>CRITICAL DEFECT ALERT</div>
-            <Title level={1} style={{ color: '#fff1f0', marginBottom: 24, fontFamily: 'Georgia, "Times New Roman", serif' }}>
+            <Title level={1} style={{ color: '#fff1f0', marginBottom: 24 }}>
               严重缺陷已触发报警
             </Title>
-            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,120,117,0.25)', borderRadius: 24, padding: 28, textAlign: 'left' }}>
+            <div className="critical-alert-panel">
               <p><strong>缺陷标题：</strong>{criticalAlert.name}</p>
               <p><strong>缺陷类型：</strong>{criticalAlert.defect_type}</p>
               <p><strong>所属产线：</strong>{criticalAlert.production_line}</p>

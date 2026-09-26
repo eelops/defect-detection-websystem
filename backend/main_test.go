@@ -189,6 +189,150 @@ func TestViewerCannotManageUsers(t *testing.T) {
 	}
 }
 
+func TestAssignableUsersEndpointOnlyReturnsActiveInspectors(t *testing.T) {
+	app := newTestApp(t)
+	activeInspector := createTestUser(t, app, "assignable_active_test", "可指派质检员", "inspector")
+	disabledInspector := createTestUser(t, app, "assignable_disabled_test", "停用质检员", "inspector")
+	viewer := createTestUser(t, app, "assignable_viewer_test", "查看员", "viewer")
+	if _, err := app.updateUser(disabledInspector.ID, updateUserRequest{IsActive: boolPtr(false)}); err != nil {
+		t.Fatalf("disable inspector: %v", err)
+	}
+
+	resp := performRequest(t, app, http.MethodGet, "/api/users/assignable", "", map[string]string{
+		"Authorization": bearerForUser(t, app, activeInspector.Username),
+	})
+	if resp.Code != http.StatusOK {
+		t.Fatalf("assignable users status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+
+	var users []User
+	if err := json.Unmarshal(resp.Body.Bytes(), &users); err != nil {
+		t.Fatalf("decode users: %v", err)
+	}
+	foundActive := false
+	for _, user := range users {
+		if user.Role != "inspector" || !user.IsActive {
+			t.Fatalf("unexpected assignable user: %+v", user)
+		}
+		if user.ID == activeInspector.ID {
+			foundActive = true
+		}
+		if user.ID == disabledInspector.ID || user.ID == viewer.ID {
+			t.Fatalf("non-assignable user leaked: %+v", user)
+		}
+	}
+	if !foundActive {
+		t.Fatal("expected active inspector to be returned")
+	}
+}
+
+func TestAssignRequiresActiveInspectorParticipants(t *testing.T) {
+	app := newTestApp(t)
+	defect := seedDefect(t, app)
+	activeInspector := createTestUser(t, app, "participant_active_test", "有效质检员", "inspector")
+	disabledInspector := createTestUser(t, app, "participant_disabled_test", "停用质检员", "inspector")
+	viewer := createTestUser(t, app, "participant_viewer_test", "查看员", "viewer")
+	if _, err := app.updateUser(disabledInspector.ID, updateUserRequest{IsActive: boolPtr(false)}); err != nil {
+		t.Fatalf("disable inspector: %v", err)
+	}
+	adminAuth := bearerForUser(t, app, "admin")
+
+	cases := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "viewer assignee",
+			body: fmt.Sprintf(`{"action":"assign","assignee_id":%d,"acceptor_id":%d}`, viewer.ID, activeInspector.ID),
+		},
+		{
+			name: "missing acceptor",
+			body: fmt.Sprintf(`{"action":"assign","assignee_id":%d}`, activeInspector.ID),
+		},
+		{
+			name: "disabled acceptor",
+			body: fmt.Sprintf(`{"action":"assign","assignee_id":%d,"acceptor_id":%d}`, activeInspector.ID, disabledInspector.ID),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := performRequest(t, app, http.MethodPost, fmt.Sprintf("/api/defects/%d/actions", defect.ID), tc.body, map[string]string{
+				"Authorization": adminAuth,
+				"Content-Type":  "application/json",
+			})
+			if resp.Code != http.StatusBadRequest {
+				t.Fatalf("assign status = %d, want %d, body = %s", resp.Code, http.StatusBadRequest, resp.Body.String())
+			}
+		})
+	}
+}
+
+func TestAssignedInspectorsCanCompleteDefectFlow(t *testing.T) {
+	app := newTestApp(t)
+	defect := seedDefect(t, app)
+	assignee := createTestUser(t, app, "flow_assignee_test", "处理质检员", "inspector")
+	acceptor := createTestUser(t, app, "flow_acceptor_test", "验收质检员", "inspector")
+	adminAuth := bearerForUser(t, app, "admin")
+	assigneeAuth := bearerForUser(t, app, assignee.Username)
+	acceptorAuth := bearerForUser(t, app, acceptor.Username)
+
+	assignResp := performRequest(t, app, http.MethodPost, fmt.Sprintf("/api/defects/%d/actions", defect.ID), fmt.Sprintf(`{"action":"assign","assignee_id":%d,"acceptor_id":%d}`, assignee.ID, acceptor.ID), map[string]string{
+		"Authorization": adminAuth,
+		"Content-Type":  "application/json",
+	})
+	if assignResp.Code != http.StatusOK {
+		t.Fatalf("assign status = %d, body = %s", assignResp.Code, assignResp.Body.String())
+	}
+
+	startResp := performRequest(t, app, http.MethodPost, fmt.Sprintf("/api/defects/%d/actions", defect.ID), `{"action":"start_process"}`, map[string]string{
+		"Authorization": assigneeAuth,
+		"Content-Type":  "application/json",
+	})
+	if startResp.Code != http.StatusOK {
+		t.Fatalf("start status = %d, body = %s", startResp.Code, startResp.Body.String())
+	}
+
+	submitResp := performRequest(t, app, http.MethodPost, fmt.Sprintf("/api/defects/%d/actions", defect.ID), `{"action":"submit_for_acceptance","process_result":"已完成返工处理"}`, map[string]string{
+		"Authorization": assigneeAuth,
+		"Content-Type":  "application/json",
+	})
+	if submitResp.Code != http.StatusOK {
+		t.Fatalf("submit status = %d, body = %s", submitResp.Code, submitResp.Body.String())
+	}
+
+	acceptResp := performRequest(t, app, http.MethodPost, fmt.Sprintf("/api/defects/%d/actions", defect.ID), `{"action":"accept","acceptance_comment":"验收通过"}`, map[string]string{
+		"Authorization": acceptorAuth,
+		"Content-Type":  "application/json",
+	})
+	if acceptResp.Code != http.StatusOK {
+		t.Fatalf("accept status = %d, body = %s", acceptResp.Code, acceptResp.Body.String())
+	}
+
+	closeResp := performRequest(t, app, http.MethodPost, fmt.Sprintf("/api/defects/%d/actions", defect.ID), `{"action":"close"}`, map[string]string{
+		"Authorization": adminAuth,
+		"Content-Type":  "application/json",
+	})
+	if closeResp.Code != http.StatusOK {
+		t.Fatalf("close status = %d, body = %s", closeResp.Code, closeResp.Body.String())
+	}
+
+	updated, err := app.findDefect(defect.ID)
+	if err != nil {
+		t.Fatalf("find defect: %v", err)
+	}
+	if updated.Status != "closed" {
+		t.Fatalf("status = %q, want closed", updated.Status)
+	}
+	var flowLogCount int
+	if err := app.db.QueryRow(`SELECT COUNT(*) FROM defect_flow_logs WHERE defect_id = ?`, defect.ID).Scan(&flowLogCount); err != nil {
+		t.Fatalf("count flow logs: %v", err)
+	}
+	if flowLogCount != 5 {
+		t.Fatalf("flow log count = %d, want 5", flowLogCount)
+	}
+}
+
 func TestLogoutInvalidatesToken(t *testing.T) {
 	app := newTestApp(t)
 	authHeader := bearerForUser(t, app, "admin")
@@ -338,6 +482,53 @@ func TestExportDefectPDFNotFound(t *testing.T) {
 	}
 }
 
+func TestAlertsReturnUnclosedCriticalDefects(t *testing.T) {
+	app := newTestApp(t)
+	critical, err := app.insertDefect("严重告警缺陷", "裂纹", "critical", stringPtr("A产线-工位3"), nil, nil)
+	if err != nil {
+		t.Fatalf("insert critical defect: %v", err)
+	}
+	closed, err := app.insertDefect("已关闭严重缺陷", "裂纹", "critical", stringPtr("A产线-工位4"), nil, nil)
+	if err != nil {
+		t.Fatalf("insert closed critical defect: %v", err)
+	}
+	_, err = app.db.Exec(`UPDATE defects SET status = 'closed', updated_at = ? WHERE id = ?`, time.Now().Format(time.RFC3339), closed.ID)
+	if err != nil {
+		t.Fatalf("close defect: %v", err)
+	}
+	if _, err := app.insertDefect("高等级但非严重", "裂纹", "high", stringPtr("A产线-工位5"), nil, nil); err != nil {
+		t.Fatalf("insert high defect: %v", err)
+	}
+
+	resp := performRequest(t, app, http.MethodGet, "/api/alerts", "", map[string]string{
+		"Authorization": bearerForUser(t, app, "admin"),
+	})
+	if resp.Code != http.StatusOK {
+		t.Fatalf("GET /api/alerts status = %d, body = %s", resp.Code, resp.Body.String())
+	}
+	var alerts []Defect
+	if err := json.Unmarshal(resp.Body.Bytes(), &alerts); err != nil {
+		t.Fatalf("decode alerts: %v", err)
+	}
+	foundCritical := false
+	for _, alert := range alerts {
+		if alert.ID == critical.ID {
+			foundCritical = true
+		}
+		if alert.ID == closed.ID {
+			t.Fatalf("closed defect appeared in alerts: %+v", alert)
+		}
+		if alert.Severity != "critical" {
+			t.Fatalf("non-critical defect appeared in alerts: %+v", alert)
+		}
+		if alert.Status == "closed" {
+			t.Fatalf("closed status appeared in alerts: %+v", alert)
+		}
+	}
+	if !foundCritical {
+		t.Fatalf("inserted critical defect missing from alerts: %+v", alerts)
+	}
+}
 
 func newTestApp(t *testing.T) *App {
 	t.Helper()

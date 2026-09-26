@@ -98,6 +98,11 @@ export const fetchUsers = async () => {
   return normalizeListResponse(response.data).items;
 };
 
+export const fetchAssignableUsers = async () => {
+  const response = await API.get('/api/users/assignable');
+  return normalizeListResponse(response.data).items;
+};
+
 export const createUser = async (payload) => {
   const response = await API.post('/api/users', payload);
   return response.data;
@@ -225,4 +230,3 @@ export const updateDefectType = async (id, payload) => {
   const response = await API.put(`/api/defect-types/${id}`, payload);
   return response.data;
 };
-

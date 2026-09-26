@@ -74,11 +74,11 @@ export default function DefectList() {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ color: '#fff', margin: 0, fontSize: 20 }}>缺陷检测管理系统</h1>
+    <Layout className="app-shell">
+      <Header className="app-header">
+        <h1 style={{ margin: 0, fontSize: 20 }}>缺陷检测管理系统</h1>
       </Header>
-      <Content style={{ padding: 24 }}>
+      <Content className="page-content">
         <div style={{ marginBottom: 16, display: 'flex', gap: 12 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditRecord(null); setFormOpen(true); }}>
             新增缺陷
@@ -96,14 +96,16 @@ export default function DefectList() {
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
         </div>
 
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={data}
-          loading={loading}
-          scroll={{ x: 1000 }}
-          pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 条` }}
-        />
+        <div className="content-card" style={{ padding: 8 }}>
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={data}
+            loading={loading}
+            scroll={{ x: 1000 }}
+            pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 条` }}
+          />
+        </div>
 
         <DefectForm
           open={formOpen}

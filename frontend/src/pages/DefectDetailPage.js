@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Button,
   Card,
@@ -20,9 +20,9 @@ import {
   downloadFile,
   executeDefectAction,
   exportDefectDetailPdf,
+  fetchAssignableUsers,
   fetchDefect,
   fetchDefectFlowLogs,
-  fetchUsers,
   getImageUrl,
 } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -36,13 +36,6 @@ import {
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
-
-const cardStyle = {
-  background: 'linear-gradient(180deg, rgba(11, 26, 40, 0.96) 0%, rgba(16, 34, 51, 0.92) 100%)',
-  border: '1px solid rgba(102, 217, 255, 0.14)',
-  borderRadius: 20,
-  boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
-};
 
 const buildPdfFileName = (detail, id) => {
   const baseName = (detail?.name || `缺陷_${id}`).replace(/[\\/:*?"<>|]/g, '_');
@@ -67,16 +60,16 @@ export default function DefectDetailPage() {
   const [currentAction, setCurrentAction] = useState('');
   const [formState, setFormState] = useState({ assignee_id: undefined, acceptor_id: undefined, process_result: '', acceptance_comment: '', comment: '' });
 
-  const loadDetail = async () => {
+  const loadDetail = useCallback(async () => {
     const [detailResult, flowLogs, userList] = await Promise.all([
       fetchDefect(id),
       fetchDefectFlowLogs(id),
-      fetchUsers(),
+      fetchAssignableUsers(),
     ]);
     setDetail(detailResult);
     setLogs(flowLogs || []);
     setUsers(userList || []);
-  };
+  }, [id]);
 
   useEffect(() => {
     const load = async () => {
@@ -90,7 +83,7 @@ export default function DefectDetailPage() {
       }
     };
     load();
-  }, [id]);
+  }, [loadDetail]);
 
   const handleExportPdf = async () => {
     setExporting(true);
@@ -147,24 +140,24 @@ export default function DefectDetailPage() {
 
   if (!detail) {
     return (
-      <Card style={cardStyle}>
-        <Text style={{ color: '#e8f3fb' }}>未找到对应缺陷。</Text>
+      <Card className="content-card">
+        <Text>未找到对应缺陷。</Text>
       </Card>
     );
   }
 
   return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-        <div>
+    <Space direction="vertical" size={20} className="page-stack">
+      <div className="page-header" style={{ alignItems: 'flex-start' }}>
+        <div className="page-heading">
           <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate('/defects')} style={{ paddingLeft: 0 }}>
             返回列表
           </Button>
-          <Title level={2} style={{ color: '#f5fbff', margin: 0, fontFamily: 'Georgia, "Times New Roman", serif' }}>{detail.name || `缺陷 #${id}`}</Title>
+          <Title level={2} className="page-heading-title">{detail.name || `缺陷 #${id}`}</Title>
           <Space size={12} style={{ marginTop: 10 }}>
             <Tag color={severityColorMap[detail.severity]}>{severityLabelMap[detail.severity] || detail.severity}</Tag>
             <Tag color={statusColorMap[detail.status]}>{statusLabelMap[detail.status] || detail.status}</Tag>
-            <Tag color="cyan">当前用户：{currentUser?.display_name || currentUser?.username}</Tag>
+            <Tag color="blue">当前用户：{currentUser?.display_name || currentUser?.username}</Tag>
           </Space>
         </div>
 
@@ -178,9 +171,9 @@ export default function DefectDetailPage() {
         </Space>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.4fr) minmax(280px, 1fr)', gap: 20 }}>
-        <Card title={<span style={{ color: '#e8f3fb' }}>缺陷信息</span>} style={cardStyle} styles={{ header: { borderBottomColor: 'rgba(102, 217, 255, 0.12)' } }}>
-          <Descriptions column={1} labelStyle={{ color: '#89a8bf', width: 132 }} contentStyle={{ color: '#f5fbff' }}>
+      <div className="detail-grid">
+        <Card title="缺陷信息" className="content-card">
+          <Descriptions column={1} labelStyle={{ width: 132 }}>
             <Descriptions.Item label="标题">{detail.name || '-'}</Descriptions.Item>
             <Descriptions.Item label="类型">{detail.defect_type || '-'}</Descriptions.Item>
             <Descriptions.Item label="类型ID">{detail.defect_type_id || '-'}</Descriptions.Item>
@@ -198,38 +191,38 @@ export default function DefectDetailPage() {
             <Descriptions.Item label="验收时间">{detail.accepted_at ? new Date(detail.accepted_at).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
             <Descriptions.Item label="关闭时间">{detail.closed_at ? new Date(detail.closed_at).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
             <Descriptions.Item label="处理结果">
-              <Paragraph style={{ marginBottom: 0, color: '#f5fbff' }}>{detail.process_result || '暂无处理结果'}</Paragraph>
+              <Paragraph style={{ marginBottom: 0 }}>{detail.process_result || '暂无处理结果'}</Paragraph>
             </Descriptions.Item>
             <Descriptions.Item label="验收意见">
-              <Paragraph style={{ marginBottom: 0, color: '#f5fbff' }}>{detail.acceptance_comment || '暂无验收意见'}</Paragraph>
+              <Paragraph style={{ marginBottom: 0 }}>{detail.acceptance_comment || '暂无验收意见'}</Paragraph>
             </Descriptions.Item>
             <Descriptions.Item label="描述">
-              <Paragraph style={{ marginBottom: 0, color: '#f5fbff' }}>{detail.description || '暂无描述'}</Paragraph>
+              <Paragraph style={{ marginBottom: 0 }}>{detail.description || '暂无描述'}</Paragraph>
             </Descriptions.Item>
           </Descriptions>
         </Card>
 
-        <Card title={<span style={{ color: '#e8f3fb' }}>缺陷图片</span>} style={cardStyle} styles={{ header: { borderBottomColor: 'rgba(102, 217, 255, 0.12)' } }}>
+        <Card title="缺陷图片" className="content-card">
           {detail.image_path ? (
-            <Image src={getImageUrl(detail.image_path)} style={{ width: '100%', borderRadius: 16 }} />
+            <Image src={getImageUrl(detail.image_path)} style={{ width: '100%', borderRadius: 8 }} />
           ) : (
-            <Text style={{ color: '#9cb7ca' }}>暂无图片</Text>
+            <div className="image-placeholder">暂无图片</div>
           )}
         </Card>
       </div>
 
-      <Card title={<span style={{ color: '#e8f3fb' }}>闭环流转记录</span>} style={cardStyle} styles={{ header: { borderBottomColor: 'rgba(102, 217, 255, 0.12)' } }}>
+      <Card title="闭环流转记录" className="content-card">
         <Timeline
           items={logs.map((item) => ({
             color: statusColorMap[item.to_status] || 'blue',
             children: (
-              <Space direction="vertical" size={4}>
-                <Text style={{ color: '#f5fbff', fontWeight: 600 }}>{defectActionLabels[item.action] || item.action}</Text>
-                <Text style={{ color: '#b9d4e6' }}>{item.operator_name} · {item.operator_role}</Text>
-                <Text style={{ color: '#87a5bb' }}>{new Date(item.created_at).toLocaleString('zh-CN')}</Text>
-                <Text style={{ color: '#dcebf7' }}>{statusLabelMap[item.from_status] || item.from_status} → {statusLabelMap[item.to_status] || item.to_status}</Text>
-                {item.comment ? <Text style={{ color: '#f5fbff' }}>{item.comment}</Text> : null}
-              </Space>
+              <div className="timeline-entry">
+                <Text strong>{defectActionLabels[item.action] || item.action}</Text>
+                <Text type="secondary">{item.operator_name} · {item.operator_role}</Text>
+                <Text type="secondary">{new Date(item.created_at).toLocaleString('zh-CN')}</Text>
+                <Text>{statusLabelMap[item.from_status] || item.from_status} → {statusLabelMap[item.to_status] || item.to_status}</Text>
+                {item.comment ? <Text>{item.comment}</Text> : null}
+              </div>
             ),
           }))}
         />
@@ -247,7 +240,7 @@ export default function DefectDetailPage() {
           {actionNeedsAssignee(currentAction) ? (
             <>
               <div>
-                <Text style={{ color: '#303133' }}>处理人</Text>
+                <Text>处理人</Text>
                 <Select
                   style={{ width: '100%', marginTop: 8 }}
                   options={userOptions}
@@ -256,9 +249,8 @@ export default function DefectDetailPage() {
                 />
               </div>
               <div>
-                <Text style={{ color: '#303133' }}>验收人</Text>
+                <Text>验收人</Text>
                 <Select
-                  allowClear
                   style={{ width: '100%', marginTop: 8 }}
                   options={userOptions}
                   value={formState.acceptor_id}
@@ -270,20 +262,20 @@ export default function DefectDetailPage() {
 
           {actionNeedsProcessResult(currentAction) ? (
             <div>
-              <Text style={{ color: '#303133' }}>处理结果</Text>
+              <Text>处理结果</Text>
               <TextArea rows={4} value={formState.process_result} onChange={(event) => setFormState((prev) => ({ ...prev, process_result: event.target.value }))} style={{ marginTop: 8 }} />
             </div>
           ) : null}
 
           {actionNeedsAcceptanceComment(currentAction) ? (
             <div>
-              <Text style={{ color: '#303133' }}>{currentAction === 'reject' ? '退回原因' : '验收意见'}</Text>
+              <Text>{currentAction === 'reject' ? '退回原因' : '验收意见'}</Text>
               <TextArea rows={4} value={formState.acceptance_comment} onChange={(event) => setFormState((prev) => ({ ...prev, acceptance_comment: event.target.value }))} style={{ marginTop: 8 }} />
             </div>
           ) : null}
 
           <div>
-            <Text style={{ color: '#303133' }}>备注</Text>
+            <Text>备注</Text>
             <TextArea rows={3} value={formState.comment} onChange={(event) => setFormState((prev) => ({ ...prev, comment: event.target.value }))} style={{ marginTop: 8 }} />
           </div>
         </Space>

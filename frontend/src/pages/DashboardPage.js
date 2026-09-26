@@ -8,12 +8,7 @@ import { severityLabelMap, severityOptions, statusLabelMap } from '../constants/
 
 const { Title, Text } = Typography;
 
-const cardStyle = {
-  background: 'linear-gradient(180deg, rgba(11, 26, 40, 0.96) 0%, rgba(16, 34, 51, 0.92) 100%)',
-  border: '1px solid rgba(102, 217, 255, 0.14)',
-  borderRadius: 20,
-  boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
-};
+const chartPalette = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2'];
 
 function buildTrend(items) {
   const map = new Map();
@@ -79,12 +74,12 @@ export default function DashboardPage() {
   const lineData = useMemo(() => buildTrend(items), [items]);
 
   return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <div>
-        <Title level={2} style={{ color: '#f5fbff', margin: 0, fontFamily: 'Georgia, "Times New Roman", serif' }}>
-          数据看板
-        </Title>
-        <Text style={{ color: 'rgba(216, 232, 246, 0.72)' }}>汇总缺陷数量、风险等级分布与近 7 天趋势。</Text>
+    <Space direction="vertical" size={20} className="page-stack">
+      <div className="page-header">
+        <div className="page-heading">
+          <Title level={2} className="page-heading-title">数据看板</Title>
+          <Text className="page-heading-subtitle">汇总缺陷数量、风险等级分布与近 7 天趋势。</Text>
+        </div>
       </div>
 
       {criticalOpenItems.length > 0 && (
@@ -92,55 +87,62 @@ export default function DashboardPage() {
           type="error"
           showIcon
           icon={<AlertOutlined />}
-          message={<span style={{ color: '#fff1f0', fontWeight: 700 }}>当前存在 {criticalOpenItems.length} 条未关闭严重缺陷</span>}
+          message={<span style={{ fontWeight: 700 }}>当前存在 {criticalOpenItems.length} 条未关闭严重缺陷</span>}
           description={(
             <Space direction="vertical" size={6} style={{ width: '100%' }}>
               {criticalOpenItems.map((item) => (
-                <Text key={item.id} style={{ color: '#ffd8d6' }}>
+                <Text key={item.id}>
                   #{item.id} {item.name} ｜ {item.location || '位置未填写'} ｜ {statusLabelMap[item.status] || item.status}
                 </Text>
               ))}
             </Space>
           )}
-          style={{
-            background: 'linear-gradient(180deg, rgba(84, 14, 19, 0.96) 0%, rgba(56, 10, 14, 0.94) 100%)',
-            border: '1px solid rgba(255, 120, 117, 0.3)',
-            borderRadius: 18,
-          }}
         />
       )}
 
       <Row gutter={[18, 18]}>
         <Col xs={24} md={12} xl={6}>
-          <Card loading={loading} style={cardStyle} styles={{ body: { padding: 22 } }}>
-            <Statistic title={<span style={{ color: '#89a8bf' }}>缺陷总数</span>} value={items.length} prefix={<DashboardOutlined style={{ color: '#66d9ff' }} />} valueStyle={{ color: '#f3fbff' }} />
+          <Card loading={loading} className="stat-card">
+            <div className="metric-card">
+              <Statistic title="缺陷总数" value={items.length} />
+              <div className="metric-icon"><DashboardOutlined /></div>
+            </div>
           </Card>
         </Col>
         <Col xs={24} md={12} xl={6}>
-          <Card loading={loading} style={cardStyle} styles={{ body: { padding: 22 } }}>
-            <Statistic title={<span style={{ color: '#89a8bf' }}>严重缺陷</span>} value={severityStats.critical} prefix={<FireOutlined style={{ color: '#ff4d4f' }} />} valueStyle={{ color: '#fff1f0' }} />
+          <Card loading={loading} className="stat-card">
+            <div className="metric-card">
+              <Statistic title="严重缺陷" value={severityStats.critical} />
+              <div className="metric-icon danger"><FireOutlined /></div>
+            </div>
           </Card>
         </Col>
         <Col xs={24} md={12} xl={6}>
-          <Card loading={loading} style={cardStyle} styles={{ body: { padding: 22 } }}>
-            <Statistic title={<span style={{ color: '#89a8bf' }}>高等级缺陷</span>} value={severityStats.high} prefix={<BugOutlined style={{ color: '#fa8c16' }} />} valueStyle={{ color: '#fff7e6' }} />
+          <Card loading={loading} className="stat-card">
+            <div className="metric-card">
+              <Statistic title="高等级缺陷" value={severityStats.high} />
+              <div className="metric-icon warning"><BugOutlined /></div>
+            </div>
           </Card>
         </Col>
         <Col xs={24} md={12} xl={6}>
-          <Card loading={loading} style={cardStyle} styles={{ body: { padding: 22 } }}>
-            <Statistic title={<span style={{ color: '#89a8bf' }}>已解决缺陷</span>} value={items.filter((item) => item.status === 'closed').length} prefix={<SafetyCertificateOutlined style={{ color: '#52c41a' }} />} valueStyle={{ color: '#f6ffed' }} />
+          <Card loading={loading} className="stat-card">
+            <div className="metric-card">
+              <Statistic title="已解决缺陷" value={items.filter((item) => item.status === 'closed').length} />
+              <div className="metric-icon success"><SafetyCertificateOutlined /></div>
+            </div>
           </Card>
         </Col>
       </Row>
 
       <Row gutter={[18, 18]}>
         <Col xs={24} xl={10}>
-          <Card title={<span style={{ color: '#e8f3fb' }}>各等级数量</span>} loading={loading} style={cardStyle} styles={{ header: { borderBottomColor: 'rgba(102, 217, 255, 0.12)' } }}>
+          <Card title="各等级数量" loading={loading} className="content-card">
             <Space direction="vertical" style={{ width: '100%' }} size={14}>
               {severityOptions.map((item) => (
-                <div key={item.value} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,0.03)' }}>
-                  <Text style={{ color: '#dbe8f3' }}>{severityLabelMap[item.value]}</Text>
-                  <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: 700 }}>{severityStats[item.value]}</Text>
+                <div key={item.value} className="severity-row">
+                  <Text>{severityLabelMap[item.value]}</Text>
+                  <Text style={{ fontSize: 18, fontWeight: 700 }}>{severityStats[item.value]}</Text>
                 </div>
               ))}
             </Space>
@@ -148,17 +150,17 @@ export default function DashboardPage() {
         </Col>
 
         <Col xs={24} xl={14}>
-          <Card title={<span style={{ color: '#e8f3fb' }}>缺陷类型分布</span>} loading={loading} style={cardStyle} styles={{ header: { borderBottomColor: 'rgba(102, 217, 255, 0.12)' } }}>
+          <Card title="缺陷类型分布" loading={loading} className="content-card">
             {pieData.length ? (
               <Pie
                 data={pieData}
                 angleField="value"
                 colorField="type"
                 innerRadius={0.55}
-                legend={{ position: 'bottom', itemName: { style: { fill: '#dbe8f3' } } }}
-                label={{ text: 'value', style: { fill: '#fff', fontWeight: 600 } }}
+                legend={{ position: 'bottom', itemName: { style: { fill: '#475467' } } }}
+                label={{ text: 'value', style: { fill: '#1f2937', fontWeight: 600 } }}
                 tooltip={{ items: [{ channel: 'y', name: '数量' }] }}
-                scale={{ color: { range: ['#66d9ff', '#52c41a', '#faad14', '#ff7875', '#9254de', '#13c2c2'] } }}
+                scale={{ color: { range: chartPalette } }}
               />
             ) : (
               <Empty description="暂无图表数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
@@ -167,15 +169,15 @@ export default function DashboardPage() {
         </Col>
       </Row>
 
-      <Card title={<span style={{ color: '#e8f3fb' }}>近 7 天缺陷趋势</span>} loading={loading} style={cardStyle} styles={{ header: { borderBottomColor: 'rgba(102, 217, 255, 0.12)' } }}>
+      <Card title="近 7 天缺陷趋势" loading={loading} className="content-card">
         {lineData.length ? (
           <Line
             data={lineData}
             xField="date"
             yField="value"
-            point={{ size: 5, shape: 'diamond', style: { fill: '#66d9ff', stroke: '#09131d', lineWidth: 2 } }}
-            style={{ lineWidth: 3, stroke: '#66d9ff' }}
-            axis={{ x: { labelFill: '#aac6d9' }, y: { labelFill: '#aac6d9' } }}
+            point={{ size: 5, shape: 'diamond', style: { fill: '#2563eb', stroke: '#ffffff', lineWidth: 2 } }}
+            style={{ lineWidth: 3, stroke: '#2563eb' }}
+            axis={{ x: { labelFill: '#667085' }, y: { labelFill: '#667085' } }}
             tooltip={{ items: [{ channel: 'y', name: '新增缺陷' }] }}
             smooth
           />

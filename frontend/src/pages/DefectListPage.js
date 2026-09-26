@@ -36,13 +36,6 @@ import {
 
 const { Title, Text } = Typography;
 
-const cardStyle = {
-  background: 'linear-gradient(180deg, rgba(11, 26, 40, 0.96) 0%, rgba(16, 34, 51, 0.92) 100%)',
-  border: '1px solid rgba(102, 217, 255, 0.14)',
-  borderRadius: 20,
-  boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
-};
-
 const sampleDefects = [
   '冲压面板边缘裂纹 · 产线A · 严重',
   '焊点虚焊偏移 · 产线B · 中等',
@@ -81,6 +74,8 @@ export default function DefectListPage() {
     severity: undefined,
     status: undefined,
   });
+  const currentPage = pagination.current;
+  const currentPageSize = pagination.pageSize;
 
   const canEdit = hasRole('admin', 'inspector');
   const canDelete = hasRole('admin');
@@ -107,7 +102,7 @@ export default function DefectListPage() {
     loadMasterData();
   }, []);
 
-  const loadData = useCallback(async (page = pagination.current, pageSize = pagination.pageSize) => {
+  const loadData = useCallback(async (page = 1, pageSize = 10) => {
     setLoading(true);
     try {
       const result = await fetchDefects({
@@ -122,21 +117,21 @@ export default function DefectListPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.current, pagination.pageSize]);
+  }, [filters]);
 
   useEffect(() => {
-    loadData(1, pagination.pageSize);
-  }, [filters, loadData, pagination.pageSize]);
+    loadData(1, currentPageSize);
+  }, [filters, loadData, currentPageSize]);
 
-  const handleDelete = async (id) => {
+  const handleDelete = useCallback(async (id) => {
     try {
       await deleteDefect(id);
       message.success('删除成功');
-      loadData();
+      loadData(currentPage, currentPageSize);
     } catch (error) {
       message.error(error?.response?.data?.detail || '删除失败');
     }
-  };
+  }, [currentPage, currentPageSize, loadData]);
 
   const handleExportExcel = async () => {
     setExporting(true);
@@ -177,7 +172,7 @@ export default function DefectListPage() {
         title: '图片',
         dataIndex: 'image_path',
         width: 110,
-        render: (value) => value ? <Image width={64} height={64} src={getImageUrl(value)} style={{ objectFit: 'cover', borderRadius: 12 }} /> : <Text style={{ color: '#87a5bb' }}>暂无</Text>,
+        render: (value) => value ? <Image width={64} height={64} src={getImageUrl(value)} style={{ objectFit: 'cover', borderRadius: 8 }} /> : <Text type="secondary">暂无</Text>,
       },
       { title: '标题', dataIndex: 'name', ellipsis: true, width: 180 },
       { title: '缺陷类型', dataIndex: 'defect_type', width: 160, render: (value) => value || '-' },
@@ -237,14 +232,14 @@ export default function DefectListPage() {
         ),
       },
     ];
-  }, [canDelete, canEdit, navigate]);
+  }, [canDelete, canEdit, handleDelete, navigate]);
 
   return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <Title level={2} style={{ color: '#f5fbff', margin: 0, fontFamily: 'Georgia, "Times New Roman", serif' }}>缺陷列表</Title>
-          <Text style={{ color: 'rgba(216, 232, 246, 0.72)' }}>按主数据、等级、状态筛选并维护缺陷闭环台账。</Text>
+    <Space direction="vertical" size={20} className="page-stack">
+      <div className="page-header">
+        <div className="page-heading">
+          <Title level={2} className="page-heading-title">缺陷列表</Title>
+          <Text className="page-heading-subtitle">按主数据、等级、状态筛选并维护缺陷闭环台账。</Text>
         </div>
         <Space>
           <Button icon={<DownloadOutlined />} loading={exporting} onClick={handleExportExcel}>导出 Excel</Button>
@@ -252,32 +247,32 @@ export default function DefectListPage() {
         </Space>
       </div>
 
-      <Card style={cardStyle} styles={{ body: { padding: 20 } }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          <div>
+      <Card className="content-card">
+        <div className="assist-grid">
+          <div className="assist-panel">
             <Space size={8} style={{ marginBottom: 10 }}>
-              <TeamOutlined style={{ color: '#66d9ff' }} />
-              <Text style={{ color: '#f5fbff', fontWeight: 600 }}>演示账号 / 工人账号</Text>
+              <TeamOutlined style={{ color: '#2563eb' }} />
+              <Text strong>演示账号 / 工人账号</Text>
             </Space>
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               {demoAccounts.map((item) => (
-                <div key={item.role} style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(102, 217, 255, 0.1)' }}>
-                  <Text style={{ color: '#9cc7dc', display: 'block' }}>{item.role}</Text>
-                  <Text style={{ color: '#f5fbff' }}>{item.account}</Text>
+                <div key={item.role} className="assist-account">
+                  <Text type="secondary" style={{ display: 'block' }}>{item.role}</Text>
+                  <Text>{item.account}</Text>
                 </div>
               ))}
             </Space>
           </div>
-          <div>
-            <Text style={{ color: '#f5fbff', fontWeight: 600, display: 'block', marginBottom: 10 }}>示例缺陷标题</Text>
+          <div className="assist-panel">
+            <Text strong style={{ display: 'block', marginBottom: 10 }}>示例缺陷标题</Text>
             <Space wrap>
               {sampleDefects.map((item) => (
-                <Tag key={item} color="cyan" style={{ padding: '6px 10px', borderRadius: 999 }}>
+                <Tag key={item} color="blue" style={{ padding: '6px 10px' }}>
                   {item}
                 </Tag>
               ))}
             </Space>
-            <Text style={{ color: '#87a5bb', display: 'block', marginTop: 12 }}>
+            <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
               可直接参考这些示例创建演示数据，便于展示缺陷录入、处理、验收与关闭流程。
             </Text>
           </div>
@@ -288,20 +283,19 @@ export default function DefectListPage() {
         type="info"
         showIcon
         icon={<ApiOutlined />}
-        message={<span style={{ color: '#f5fbff' }}>第三方缺陷 JSON 推送接口</span>}
+        message="第三方缺陷 JSON 推送接口"
         description={(
-          <div style={{ color: '#dbe8f3', lineHeight: 1.8 }}>
+          <div style={{ lineHeight: 1.8 }}>
             <div><strong>接口地址：</strong><code>POST http://localhost:8000/api/external/report</code></div>
             <div><strong>认证方式：</strong>Header 携带 <code>X-API-Key</code></div>
             <div><strong>数据格式：</strong>application/json，支持图片 base64、缺陷类型、等级、位置、置信度、来源等字段</div>
           </div>
         )}
-        style={{ background: 'rgba(9, 28, 43, 0.92)', border: '1px solid rgba(102, 217, 255, 0.22)', borderRadius: 18 }}
       />
 
-      <Card style={cardStyle} styles={{ body: { padding: 20 } }}>
-        <Space wrap size={12} style={{ width: '100%', justifyContent: 'space-between' }}>
-          <Space wrap size={12}>
+      <Card className="toolbar-card">
+        <div className="filter-grid">
+          <div className="filter-controls">
             <Select
               allowClear
               placeholder="按缺陷类型筛选"
@@ -346,13 +340,13 @@ export default function DefectListPage() {
               options={statusOptions}
               onChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}
             />
-          </Space>
+          </div>
 
-          <Button icon={<ReloadOutlined />} onClick={() => loadData(1, pagination.pageSize)}>刷新</Button>
-        </Space>
+          <Button icon={<ReloadOutlined />} onClick={() => loadData(1, currentPageSize)}>刷新</Button>
+        </div>
       </Card>
 
-      <Card style={cardStyle} styles={{ body: { padding: 8 } }}>
+      <Card className="content-card table-card">
         <Table
           rowKey="id"
           columns={columns}
@@ -361,7 +355,7 @@ export default function DefectListPage() {
           scroll={{ x: 1940 }}
           pagination={{
             current: pagination.current,
-            pageSize: pagination.pageSize,
+            pageSize: currentPageSize,
             total: pagination.total,
             showSizeChanger: true,
             showTotal: (total) => `共 ${total} 条`,

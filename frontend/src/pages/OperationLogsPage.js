@@ -1,16 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Card, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { fetchOperationLogs } from '../api';
 
 const { RangePicker } = DatePicker;
 const { Title, Text } = Typography;
-
-const cardStyle = {
-  background: 'linear-gradient(180deg, rgba(11, 26, 40, 0.96) 0%, rgba(16, 34, 51, 0.92) 100%)',
-  border: '1px solid rgba(102, 217, 255, 0.14)',
-  borderRadius: 20,
-  boxShadow: '0 18px 40px rgba(0, 0, 0, 0.22)',
-};
 
 const resultColorMap = {
   success: 'green',
@@ -24,7 +17,7 @@ export default function OperationLogsPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20, total: 0 });
   const [detailItem, setDetailItem] = useState(null);
 
-  const loadLogs = async (page = pagination.current, pageSize = pagination.pageSize) => {
+  const loadLogs = useCallback(async (page = 1, pageSize = 20) => {
     setLoading(true);
     try {
       const values = form.getFieldsValue();
@@ -46,11 +39,11 @@ export default function OperationLogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [form]);
 
   useEffect(() => {
-    loadLogs(1, pagination.pageSize);
-  }, []);
+    loadLogs(1, 20);
+  }, [loadLogs]);
 
   const columns = useMemo(() => ([
     {
@@ -89,13 +82,15 @@ export default function OperationLogsPage() {
   ]), []);
 
   return (
-    <Space direction="vertical" size={24} style={{ width: '100%' }}>
-      <div>
-        <Title level={2} style={{ color: '#f5fbff', margin: 0, fontFamily: 'Georgia, "Times New Roman", serif' }}>操作日志</Title>
-        <Text style={{ color: 'rgba(216, 232, 246, 0.72)' }}>查看关键业务操作和安全审计记录。</Text>
+    <Space direction="vertical" size={20} className="page-stack">
+      <div className="page-header">
+        <div className="page-heading">
+          <Title level={2} className="page-heading-title">操作日志</Title>
+          <Text className="page-heading-subtitle">查看关键业务操作和安全审计记录。</Text>
+        </div>
       </div>
 
-      <Card style={cardStyle}>
+      <Card className="toolbar-card">
         <Form form={form} layout="inline" onFinish={() => loadLogs(1, pagination.pageSize)}>
           <Form.Item name="module" label="模块">
             <Select allowClear style={{ width: 140 }} options={[
@@ -128,7 +123,7 @@ export default function OperationLogsPage() {
         </Form>
       </Card>
 
-      <Card style={cardStyle} styles={{ body: { padding: 8 } }}>
+      <Card className="content-card table-card">
         <Table
           rowKey="id"
           columns={columns}
@@ -147,11 +142,11 @@ export default function OperationLogsPage() {
       <Modal open={!!detailItem} title="日志详情" footer={null} onCancel={() => setDetailItem(null)} width={760} destroyOnHidden>
         {detailItem && (
           <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            <Text style={{ color: '#f3fbff' }}>摘要：{detailItem.summary}</Text>
-            <Text style={{ color: '#dbe8f3' }}>请求：{detailItem.request_method || '-'} {detailItem.request_path || '-'}</Text>
-            <Text style={{ color: '#dbe8f3' }}>IP：{detailItem.ip_address || '-'}</Text>
-            <Text style={{ color: '#dbe8f3' }}>User-Agent：{detailItem.user_agent || '-'}</Text>
-            <pre style={{ margin: 0, padding: 12, background: '#081018', color: '#d6e8f5', borderRadius: 12, overflow: 'auto', border: '1px solid rgba(102, 217, 255, 0.14)' }}>{JSON.stringify(detailItem.details || {}, null, 2)}</pre>
+            <Text>摘要：{detailItem.summary}</Text>
+            <Text>请求：{detailItem.request_method || '-'} {detailItem.request_path || '-'}</Text>
+            <Text>IP：{detailItem.ip_address || '-'}</Text>
+            <Text>User-Agent：{detailItem.user_agent || '-'}</Text>
+            <pre className="code-block">{JSON.stringify(detailItem.details || {}, null, 2)}</pre>
           </Space>
         )}
       </Modal>

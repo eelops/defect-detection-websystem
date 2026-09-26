@@ -5,15 +5,17 @@ import {
   BellOutlined,
   BranchesOutlined,
   BugOutlined,
+  LogoutOutlined,
   LockOutlined,
   PlusCircleOutlined,
+  SafetyCertificateOutlined,
   SettingOutlined,
   TagsOutlined,
   TeamOutlined,
   ToolOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Badge, Button, Card, Dropdown, Form, Input, Layout, List, Menu, Modal, Space, Tag, Typography, message } from 'antd';
+import { Avatar, Badge, Button, Dropdown, Form, Input, Layout, List, Menu, Modal, Space, Tag, Typography, message } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { changePassword } from '../api';
 import { useAlerts } from '../context/AlertContext';
@@ -21,12 +23,12 @@ import { useAuth } from '../context/AuthContext';
 import { severityColorMap, severityLabelMap } from '../constants/defects';
 
 const { Sider, Header, Content } = Layout;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { criticalAlerts, criticalCount } = useAlerts();
+  const { criticalAlerts, criticalCount, alertError } = useAlerts();
   const { currentUser, hasRole, logout } = useAuth();
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
@@ -95,38 +97,29 @@ export default function AppLayout() {
   };
 
   const alertOverlay = (
-    <div
-      style={{
-        width: 360,
-        background: '#0d1721',
-        border: '1px solid rgba(255, 77, 79, 0.28)',
-        borderRadius: 18,
-        overflow: 'hidden',
-        boxShadow: '0 18px 48px rgba(0, 0, 0, 0.35)',
-      }}
-    >
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <Text style={{ color: '#ffd8d6', fontWeight: 700 }}>未处理严重缺陷</Text>
+    <div className="alert-dropdown">
+      <div className="alert-dropdown-header">
+        <Text>未处理严重缺陷</Text>
       </div>
       <List
         dataSource={criticalAlerts}
-        locale={{ emptyText: <span style={{ color: '#9cb7ca' }}>暂无未处理严重缺陷</span> }}
+        locale={{ emptyText: <span style={{ color: alertError ? '#dc2626' : '#667085' }}>{alertError || '暂无未处理严重缺陷'}</span> }}
         renderItem={(item) => (
           <List.Item
             style={{
               padding: '14px 16px',
-              borderBlockEnd: '1px solid rgba(255,255,255,0.05)',
+              borderBlockEnd: '1px solid #e8edf3',
               cursor: 'pointer',
             }}
             onClick={() => navigate(`/defects/${item.id}`)}
           >
             <div style={{ width: '100%' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <Text style={{ color: '#f8fbff', fontWeight: 600 }}>{item.name}</Text>
+                <Text strong>{item.name}</Text>
                 <Tag color={severityColorMap[item.severity]}>{severityLabelMap[item.severity]}</Tag>
               </div>
-              <Text style={{ color: '#aac5d8' }}>{item.defect_type}</Text>
-              <div style={{ color: '#87a5bb', marginTop: 4 }}>{item.location || '位置未填写'}</div>
+              <Text type="secondary">{item.defect_type}</Text>
+              <div style={{ color: '#667085', marginTop: 4 }}>{item.location || '位置未填写'}</div>
             </div>
           </List.Item>
         )}
@@ -136,17 +129,22 @@ export default function AppLayout() {
 
   return (
     <>
-      <Layout style={{ minHeight: '100vh', background: '#081018' }}>
-        <Sider width={252} theme="dark" style={{ background: 'linear-gradient(180deg, #07121d 0%, #0d1f2e 100%)', borderRight: '1px solid rgba(102, 217, 255, 0.16)' }}>
-          <div style={{ padding: '28px 22px 20px', borderBottom: '1px solid rgba(102, 217, 255, 0.12)' }}>
-            <Text style={{ color: '#66d9ff', fontSize: 12, letterSpacing: 3 }}>INDUSTRIAL QA</Text>
-            <Title level={3} style={{ color: '#f3f7fb', margin: '10px 0 6px', fontFamily: 'Georgia, "Times New Roman", serif' }}>
-              缺陷检测中心
-            </Title>
-            <Text style={{ color: 'rgba(219, 234, 254, 0.72)' }}>生产质检 · 可视化监控 · 全流程追踪</Text>
+      <Layout className="app-shell">
+        <Sider width={252} theme="dark" className="app-sider">
+          <div className="brand-block">
+            <div className="brand-row">
+              <div className="brand-mark">
+                <SafetyCertificateOutlined />
+              </div>
+              <div>
+                <Text className="brand-kicker">Industrial QA</Text>
+                <Text className="brand-title">缺陷检测中心</Text>
+              </div>
+            </div>
+            <Text className="brand-subtitle">生产质检 / 流程闭环 / 安全审计</Text>
           </div>
 
-          <div style={{ padding: '18px 18px 0' }}>
+          <div className="side-menu-wrap">
             <Menu
               mode="inline"
               theme="dark"
@@ -160,70 +158,37 @@ export default function AppLayout() {
         </Sider>
 
         <Layout>
-          <Header
-            style={{
-              minHeight: 88,
-              height: 'auto',
-              padding: '14px 28px',
-              background: 'rgba(6, 17, 27, 0.92)',
-              borderBottom: '1px solid rgba(102, 217, 255, 0.16)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 20,
-              flexWrap: 'wrap',
-            }}
-          >
-            <div style={{ minWidth: 260, flex: '1 1 420px' }}>
-              <div style={{ color: '#8eb3c9', letterSpacing: 2, fontSize: 12, lineHeight: 1.6, whiteSpace: 'normal' }}>
-                缺陷检测系统前端控制台
-              </div>
-              <div style={{ color: '#f8fbff', fontSize: 22, marginTop: 6, fontWeight: 600, lineHeight: 1.35, wordBreak: 'break-word' }}>
+          <Header className="app-header">
+            <div className="page-title-block">
+              <div className="page-kicker">缺陷检测系统前端控制台</div>
+              <div className="page-current-title">
                 {currentPageTitle}
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexShrink: 0, flexWrap: 'wrap' }}>
+            <div className="header-actions">
               <Dropdown popupRender={() => alertOverlay} trigger={['click']} placement="bottomRight">
                 <Badge count={criticalCount} offset={[-4, 4]}>
                   <Button
                     shape="circle"
                     icon={<BellOutlined />}
-                    size="large"
-                    style={{
-                      background: criticalCount ? 'rgba(255, 77, 79, 0.16)' : 'rgba(255,255,255,0.06)',
-                      borderColor: criticalCount ? 'rgba(255, 77, 79, 0.35)' : 'rgba(102, 217, 255, 0.14)',
-                      color: criticalCount ? '#ff7875' : '#d6e8f5',
-                    }}
+                    className="icon-button"
+                    danger={criticalCount > 0}
                   />
                 </Badge>
               </Dropdown>
-              <Badge color="#52c41a" text={<span style={{ color: '#d6e8f5' }}>后端服务：localhost:8000</span>} />
-              <Space size={10} style={{ background: 'rgba(255,255,255,0.04)', padding: '8px 12px', borderRadius: 999 }}>
-                <UserOutlined style={{ color: '#66d9ff' }} />
-                <Text style={{ color: '#f8fbff' }}>{currentUser?.display_name || currentUser?.username}</Text>
+              <Badge className="service-badge" color="#16a34a" text={<span>后端服务：localhost:8000</span>} />
+              <Space size={8} className="user-chip">
+                <Avatar size={28} style={{ background: '#eef4ff', color: '#2563eb' }} icon={<UserOutlined />} />
+                <Text strong>{currentUser?.display_name || currentUser?.username}</Text>
                 <Tag color="cyan">{currentUser?.role_label || currentUser?.role}</Tag>
                 <Button size="small" icon={<LockOutlined />} onClick={() => setPasswordOpen(true)}>修改密码</Button>
-                <Button size="small" onClick={logout}>退出</Button>
+                <Button size="small" icon={<LogoutOutlined />} onClick={logout}>退出</Button>
               </Space>
             </div>
           </Header>
 
-          <Content
-            style={{
-              padding: 28,
-              background: 'radial-gradient(circle at top right, rgba(34, 89, 128, 0.24), transparent 26%), linear-gradient(180deg, #09131d 0%, #0e1722 100%)',
-            }}
-          >
-            <Card style={{ marginBottom: 20, background: 'rgba(9, 28, 43, 0.92)', border: '1px solid rgba(102, 217, 255, 0.16)', borderRadius: 18 }}>
-              <Space direction="vertical" size={2}>
-                <Text style={{ color: '#f5fbff', fontWeight: 600 }}>演示登录信息</Text>
-                <Text style={{ color: '#cfe0ec' }}>默认管理员账号：admin / Admin@123456</Text>
-                <Text style={{ color: '#cfe0ec' }}>质检员示例账号：inspector1 / Inspector@123456</Text>
-                <Text style={{ color: '#cfe0ec' }}>工人查看账号：viewer1 / Viewer@123456</Text>
-                <Text style={{ color: '#87a5bb' }}>登录后可在右上角“修改密码”，管理员可维护用户、日志与基础数据。</Text>
-              </Space>
-            </Card>
+          <Content className="page-content">
             <Outlet />
           </Content>
         </Layout>
