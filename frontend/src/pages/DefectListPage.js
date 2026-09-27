@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -50,6 +50,9 @@ export default function DefectListPage() {
   const { hasRole } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const activeRequest = useRef(null);
+  const pageSizeRef = useRef(10);
   const [exporting, setExporting] = useState(false);
   const [masterDataLoading, setMasterDataLoading] = useState(false);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
@@ -92,25 +95,35 @@ export default function DefectListPage() {
   }, []);
 
   const loadData = useCallback(async (page = 1, pageSize = 10) => {
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    pageSizeRef.current = pageSize;
     setLoading(true);
+    setLoadError('');
     try {
       const result = await fetchDefects({
         ...filters,
         page,
         page_size: pageSize,
-      });
+      }, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       setItems(result.items || []);
       setPagination((prev) => ({ ...prev, current: page, pageSize, total: result.total || (result.items || []).length }));
     } catch (error) {
-      message.error('缺陷列表加载失败');
+      if (controller.signal.aborted) return;
+      if (error?.response?.status !== 401) {
+        setLoadError(error?.response?.data?.detail || '缺陷列表加载失败，请检查网络或稍后重试');
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [filters]);
 
   useEffect(() => {
-    loadData(1, currentPageSize);
-  }, [filters, loadData, currentPageSize]);
+    loadData(1, pageSizeRef.current);
+    return () => activeRequest.current?.abort();
+  }, [loadData]);
 
   const handleDelete = useCallback(async (id) => {
     try {
@@ -304,6 +317,9 @@ export default function DefectListPage() {
       </Card>
 
       <Card className="content-card table-card">
+        {loadError && <Alert type="error" showIcon message={loadError}
+          description="列表尚未更新；已有数据为上次成功加载的结果。"
+          action={<Button onClick={() => loadData(currentPage, currentPageSize)}>重试</Button>} />}
         <Table
           rowKey="id"
           columns={columns}

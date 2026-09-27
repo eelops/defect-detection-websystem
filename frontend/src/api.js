@@ -114,8 +114,8 @@ export const updateUser = async (id, payload) => {
   return response.data;
 };
 
-export const fetchDefects = async (params) => {
-  const response = await API.get('/api/defects', { params });
+export const fetchDefects = async (params, { signal } = {}) => {
+  const response = await API.get('/api/defects', { params, signal, timeout: 15000 });
   return normalizeListResponse(response.data);
 };
 

@@ -329,8 +329,20 @@ func newApp(databasePath, uploadPath string) (*App, error) {
 		return nil, err
 	}
 
-	db, err := sql.Open("sqlite", databasePath)
+	// Apply the busy timeout to every pooled connection. Concurrent page requests
+	// also update sessions, so reads must wait for short-lived SQLite write locks.
+	separator := "?"
+	if strings.Contains(databasePath, "?") {
+		separator = "&"
+	}
+	db, err := sql.Open("sqlite", databasePath+separator+"_pragma=busy_timeout(5000)")
 	if err != nil {
+		return nil, err
+	}
+
+	// WAL lets list reads proceed while another request updates its session.
+	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		db.Close()
 		return nil, err
 	}
 
@@ -1045,6 +1057,7 @@ func (app *App) listDefects(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		log.Printf("list defects: %v", err)
 		writeError(w, http.StatusInternalServerError, "查询缺陷失败")
 		return
 	}
