@@ -355,7 +355,7 @@ func TestExternalReportSuccess(t *testing.T) {
 	t.Setenv("EXTERNAL_API_KEY", "secret-key")
 
 	payload := `{
-		"image_base64": "` + base64.StdEncoding.EncodeToString([]byte("fake image")) + `",
+		"image_base64": "` + base64.StdEncoding.EncodeToString(testPNG(t)) + `",
 		"defect_type": "裂纹",
 		"severity": "严重",
 		"location": "产线A",
@@ -538,6 +538,7 @@ func newTestApp(t *testing.T) *App {
 	t.Setenv("SMTP_PASSWORD", "")
 	t.Setenv("SMTP_FROM", "")
 	t.Setenv("ALERT_EMAIL_TO", "")
+	t.Setenv("DEMO_MODE", "false")
 	t.Setenv("ADMIN_USERNAME", "admin")
 	t.Setenv("ADMIN_PASSWORD", "Admin@123456")
 	t.Setenv("ADMIN_DISPLAY_NAME", "系统管理员")

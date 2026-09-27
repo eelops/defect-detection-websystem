@@ -11,9 +11,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
-	"mime"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -31,6 +33,8 @@ import (
 const dbPath = "./defects.db"
 const uploadDir = "./uploads"
 const sessionDuration = 24 * time.Hour
+const maxImageBytes = 5 << 20
+const maxRequestBytes = 8 << 20
 const reportSystemName = "缺陷检测管理系统"
 const pdfChineseFontName = "zh-cn"
 const pdfChineseFontPath = "C:/Windows/Fonts/simhei.ttf"
@@ -68,9 +72,10 @@ var defectActionTransitions = map[string]map[string]string{
 		"rejected": "assigned",
 	},
 	"reassign": {
-		"assigned":   "assigned",
-		"processing": "assigned",
-		"rejected":   "assigned",
+		"pending_acceptance": "assigned",
+		"assigned":           "assigned",
+		"processing":         "assigned",
+		"rejected":           "assigned",
 	},
 	"start_process": {
 		"assigned": "processing",
@@ -339,17 +344,19 @@ func newApp(databasePath, uploadPath string) (*App, error) {
 		db.Close()
 		return nil, err
 	}
-	if err := app.ensureDemoUsers(); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if err := app.ensureDemoMasterData(); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if err := app.ensureDemoDefects(); err != nil {
-		db.Close()
-		return nil, err
+	if strings.EqualFold(os.Getenv("DEMO_MODE"), "true") {
+		if err := app.ensureDemoUsers(); err != nil {
+			db.Close()
+			return nil, err
+		}
+		if err := app.ensureDemoMasterData(); err != nil {
+			db.Close()
+			return nil, err
+		}
+		if err := app.ensureDemoDefects(); err != nil {
+			db.Close()
+			return nil, err
+		}
 	}
 	return app, nil
 }
@@ -638,7 +645,7 @@ func (app *App) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "更新密码失败")
 		return
 	}
-	if _, err := app.db.Exec(`UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`, newPasswordHash, nowString(), user.ID); err != nil {
+	if err := app.replacePassword(user.ID, newPasswordHash); err != nil {
 		writeError(w, http.StatusInternalServerError, "更新密码失败")
 		return
 	}
@@ -897,8 +904,9 @@ func (app *App) handleExternalReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var payload ExternalDefectReport
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeError(w, http.StatusBadRequest, "JSON 格式不正确")
+		writeBodyError(w, err, "JSON 格式不正确")
 		return
 	}
 	if strings.TrimSpace(payload.ImageBase64) == "" || strings.TrimSpace(payload.DefectType) == "" || strings.TrimSpace(payload.Severity) == "" {
@@ -942,11 +950,13 @@ func (app *App) handleExternalReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *App) createDefect(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		writeError(w, http.StatusBadRequest, "表单解析失败")
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+	if err := r.ParseMultipartForm(maxImageBytes); err != nil {
+		writeBodyError(w, err, "表单解析失败")
 		return
 	}
 
+	defer r.MultipartForm.RemoveAll()
 	name := strings.TrimSpace(r.FormValue("name"))
 	defectType := strings.TrimSpace(r.FormValue("defect_type"))
 	defectTypeID, err := parseOptionalInt64(r.FormValue("defect_type_id"))
@@ -999,7 +1009,7 @@ func (app *App) createDefect(w http.ResponseWriter, r *http.Request) {
 		defer file.Close()
 		savedPath, saveErr := app.saveUploadedFile(file, header.Filename)
 		if saveErr != nil {
-			writeError(w, http.StatusInternalServerError, "图片保存失败")
+			writeError(w, http.StatusBadRequest, saveErr.Error())
 			return
 		}
 		imagePath = &savedPath
@@ -1334,6 +1344,11 @@ func (app *App) updateDefect(w http.ResponseWriter, r *http.Request, id int64) {
 		description = payload.Description
 	}
 
+	if name == "" || defectType == "" {
+		writeError(w, http.StatusBadRequest, "缺陷名称和类型不能为空")
+		return
+	}
+
 	masterDefectType, masterProductionLine, masterEquipment, err := app.validateDefectMasterData(defectTypeID, productionLineID, equipmentID)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -1380,7 +1395,7 @@ func (app *App) deleteDefect(w http.ResponseWriter, r *http.Request, id int64) {
 	}
 
 	if defect.ImagePath != nil && *defect.ImagePath != "" {
-		_ = os.Remove(filepath.Join(".", strings.TrimPrefix(*defect.ImagePath, "/")))
+		_ = os.Remove(filepath.Join(app.uploadDir, filepath.Base(*defect.ImagePath)))
 	}
 	if _, err := app.db.Exec(`DELETE FROM defects WHERE id = ?`, id); err != nil {
 		writeError(w, http.StatusInternalServerError, "删除失败")
@@ -1558,6 +1573,7 @@ func migrate(db *sql.DB) error {
 		}
 	}
 	for _, column := range []struct{ name, alter string }{
+		{"workflow_version", "ALTER TABLE defects ADD COLUMN workflow_version INTEGER NOT NULL DEFAULT 0"},
 		{"location", "ALTER TABLE defects ADD COLUMN location TEXT"},
 		{"assignee_id", "ALTER TABLE defects ADD COLUMN assignee_id INTEGER"},
 		{"assignee_name", "ALTER TABLE defects ADD COLUMN assignee_name TEXT"},
@@ -1838,7 +1854,12 @@ func (app *App) updateUser(id int64, payload updateUserRequest) (*User, error) {
 	if isActive {
 		isActiveInt = 1
 	}
-	_, err = app.db.Exec(`
+	tx, err := app.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	_, err = tx.Exec(`
 		UPDATE users
 		SET password_hash = ?, display_name = ?, role = ?, is_active = ?, updated_at = ?
 		WHERE id = ?
@@ -1846,8 +1867,13 @@ func (app *App) updateUser(id int64, payload updateUserRequest) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !isActive {
-		_, _ = app.db.Exec(`DELETE FROM sessions WHERE user_id = ?`, id)
+	if !isActive || payload.Password != nil {
+		if _, err := tx.Exec(`DELETE FROM sessions WHERE user_id = ?`, id); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return app.findUser(id)
 }
@@ -1869,7 +1895,10 @@ func (app *App) ensureBootstrapAdmin() error {
 		return nil
 	}
 	username := firstNonEmpty(strings.TrimSpace(os.Getenv("ADMIN_USERNAME")), "admin")
-	password := firstNonEmpty(strings.TrimSpace(os.Getenv("ADMIN_PASSWORD")), "Admin@123456")
+	password := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD"))
+	if password == "" {
+		return errors.New("首次启动必须配置 ADMIN_PASSWORD")
+	}
 	displayName := firstNonEmpty(strings.TrimSpace(os.Getenv("ADMIN_DISPLAY_NAME")), "系统管理员")
 	hash, err := hashPassword(password)
 	if err != nil {
@@ -2189,38 +2218,52 @@ func normalizeSeverity(raw string) (string, error) {
 	return "", errors.New("不支持的缺陷等级")
 }
 
-func (app *App) saveUploadedFile(file io.Reader, originalName string) (string, error) {
-	ext := filepath.Ext(originalName)
-	if ext == "" {
-		ext = ".png"
-	}
-	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
-	targetPath := filepath.Join(app.uploadDir, filename)
-	out, err := os.Create(targetPath)
+func (app *App) saveUploadedFile(file io.Reader, _ string) (string, error) {
+	data, err := io.ReadAll(io.LimitReader(file, maxImageBytes+1))
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
-	if _, err := io.Copy(out, file); err != nil {
+	if len(data) > maxImageBytes {
+		return "", errors.New("图片不能超过 5 MB")
+	}
+	config, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil || (format != "png" && format != "jpeg") {
+		return "", errors.New("仅支持有效的 PNG 或 JPEG 图片")
+	}
+	if config.Width <= 0 || config.Height <= 0 || int64(config.Width)*int64(config.Height) > 20_000_000 {
+		return "", errors.New("图片像素不能超过 2000 万")
+	}
+	if _, _, err := image.Decode(bytes.NewReader(data)); err != nil {
+		return "", errors.New("图片内容损坏")
+	}
+	ext := ".png"
+	if format == "jpeg" {
+		ext = ".jpg"
+	}
+	out, err := os.CreateTemp(app.uploadDir, "image-*"+ext)
+	if err != nil {
 		return "", err
 	}
-	return "/uploads/" + filename, nil
+	_, writeErr := out.Write(data)
+	closeErr := out.Close()
+	if writeErr != nil || closeErr != nil {
+		_ = os.Remove(out.Name())
+		return "", errors.New("图片保存失败")
+	}
+	return "/uploads/" + filepath.Base(out.Name()), nil
 }
 
 func (app *App) saveBase64Image(imageBase64 string) (string, error) {
 	data := strings.TrimSpace(imageBase64)
-	ext := ".png"
 	if strings.HasPrefix(data, "data:") {
 		parts := strings.SplitN(data, ",", 2)
 		if len(parts) != 2 {
 			return "", errors.New("图片 base64 格式不正确")
 		}
-		meta := parts[0]
-		decodedMime := strings.TrimPrefix(strings.Split(meta, ";")[0], "data:")
-		if extensions, err := mime.ExtensionsByType(decodedMime); err == nil && len(extensions) > 0 {
-			ext = extensions[0]
-		}
 		data = parts[1]
+	}
+	if len(data) > base64.StdEncoding.EncodedLen(maxImageBytes) {
+		return "", errors.New("图片不能超过 5 MB")
 	}
 	binary, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
@@ -2229,12 +2272,7 @@ func (app *App) saveBase64Image(imageBase64 string) (string, error) {
 			return "", errors.New("图片 base64 解码失败")
 		}
 	}
-	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
-	targetPath := filepath.Join(app.uploadDir, filename)
-	if err := os.WriteFile(targetPath, binary, 0o644); err != nil {
-		return "", err
-	}
-	return "/uploads/" + filename, nil
+	return app.saveUploadedFile(bytes.NewReader(binary), "")
 }
 
 func sendCriticalDefectEmail(defect *Defect) {
@@ -2696,6 +2734,10 @@ func (app *App) handleDefectAction(w http.ResponseWriter, r *http.Request, id in
 	}
 	updated, err := app.applyDefectAction(currentUser(r.Context()), id, payload)
 	if err != nil {
+		if errors.Is(err, errDefectConflict) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "缺陷记录不存在")
 			return
@@ -2714,6 +2756,10 @@ func (app *App) handleDefectAction(w http.ResponseWriter, r *http.Request, id in
 func (app *App) applyDefectAction(user *User, id int64, payload DefectActionRequest) (*Defect, error) {
 	if user == nil {
 		return nil, errors.New("缺少登录凭证")
+	}
+	var version int64
+	if err := app.db.QueryRow(`SELECT workflow_version FROM defects WHERE id = ?`, id).Scan(&version); err != nil {
+		return nil, err
 	}
 	defect, err := app.findDefect(id)
 	if err != nil {
@@ -2810,6 +2856,9 @@ func (app *App) applyDefectAction(user *User, id int64, payload DefectActionRequ
 		return nil, err
 	}
 	defer tx.Rollback()
+	if err := advanceDefectVersion(tx, id, version); err != nil {
+		return nil, err
+	}
 
 	_, err = tx.Exec(`
 		UPDATE defects
