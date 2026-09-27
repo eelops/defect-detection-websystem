@@ -86,7 +86,8 @@ export default function AppLayout() {
         current_password: values.current_password,
         new_password: values.new_password,
       });
-      message.success('密码修改成功');
+      message.success('密码修改成功，请重新登录');
+      navigate('/login', { replace: true });
       passwordForm.resetFields();
       setPasswordOpen(false);
     } catch (error) {

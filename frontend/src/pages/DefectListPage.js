@@ -12,9 +12,10 @@ import {
   Typography,
   message,
 } from 'antd';
-import { ApiOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons';
+import { ApiOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
+  API_BASE_URL,
   deleteDefect,
   downloadFile,
   exportDefectsExcel,
@@ -35,18 +36,6 @@ import {
 } from '../constants/defects';
 
 const { Title, Text } = Typography;
-
-const sampleDefects = [
-  '冲压面板边缘裂纹 · 产线A · 严重',
-  '焊点虚焊偏移 · 产线B · 中等',
-  '涂层气泡不均 · 产线C · 轻微',
-];
-
-const demoAccounts = [
-  { role: '管理员', account: 'admin / Admin@123456' },
-  { role: '质检员示例', account: 'inspector1 / Inspector@123456' },
-  { role: '工人查看账号', account: 'viewer1 / Viewer@123456' },
-];
 
 const buildExcelFileName = () => {
   const today = new Date();
@@ -176,7 +165,7 @@ export default function DefectListPage() {
       },
       { title: '标题', dataIndex: 'name', ellipsis: true, width: 180 },
       { title: '缺陷类型', dataIndex: 'defect_type', width: 160, render: (value) => value || '-' },
-      { title: '所属产线', dataIndex: 'production_line', width: 140, render: (value) => value || '-' },
+      { title: '所属产线', dataIndex: 'production_line_name', width: 140, render: (value) => value || '-' },
       { title: '设备', dataIndex: 'equipment_name', width: 140, render: (value) => value || '-' },
       {
         title: '等级',
@@ -222,7 +211,7 @@ export default function DefectListPage() {
         render: (_, record) => (
           <Space size="small" wrap>
             <Button type="link" icon={<EyeOutlined />} onClick={() => navigate(`/defects/${record.id}`)}>查看详情</Button>
-            {canEdit && <Button type="link" icon={<EditOutlined />} onClick={() => navigate(`/defects/${record.id}`)}>编辑</Button>}
+            {canEdit && <Button type="link" icon={<EditOutlined />} onClick={() => navigate(`/defects/${record.id}?edit=1`)}>编辑</Button>}
             {canDelete && (
               <Popconfirm title="确认删除该缺陷吗？" onConfirm={() => handleDelete(record.id)}>
                 <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
@@ -247,38 +236,6 @@ export default function DefectListPage() {
         </Space>
       </div>
 
-      <Card className="content-card">
-        <div className="assist-grid">
-          <div className="assist-panel">
-            <Space size={8} style={{ marginBottom: 10 }}>
-              <TeamOutlined style={{ color: '#2563eb' }} />
-              <Text strong>演示账号 / 工人账号</Text>
-            </Space>
-            <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              {demoAccounts.map((item) => (
-                <div key={item.role} className="assist-account">
-                  <Text type="secondary" style={{ display: 'block' }}>{item.role}</Text>
-                  <Text>{item.account}</Text>
-                </div>
-              ))}
-            </Space>
-          </div>
-          <div className="assist-panel">
-            <Text strong style={{ display: 'block', marginBottom: 10 }}>示例缺陷标题</Text>
-            <Space wrap>
-              {sampleDefects.map((item) => (
-                <Tag key={item} color="blue" style={{ padding: '6px 10px' }}>
-                  {item}
-                </Tag>
-              ))}
-            </Space>
-            <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-              可直接参考这些示例创建演示数据，便于展示缺陷录入、处理、验收与关闭流程。
-            </Text>
-          </div>
-        </div>
-      </Card>
-
       <Alert
         type="info"
         showIcon
@@ -286,7 +243,7 @@ export default function DefectListPage() {
         message="第三方缺陷 JSON 推送接口"
         description={(
           <div style={{ lineHeight: 1.8 }}>
-            <div><strong>接口地址：</strong><code>POST http://localhost:8000/api/external/report</code></div>
+            <div><strong>接口地址：</strong><code>POST {API_BASE_URL}/api/external/report</code></div>
             <div><strong>认证方式：</strong>Header 携带 <code>X-API-Key</code></div>
             <div><strong>数据格式：</strong>application/json，支持图片 base64、缺陷类型、等级、位置、置信度、来源等字段</div>
           </div>

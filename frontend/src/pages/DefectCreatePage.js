@@ -59,8 +59,14 @@ export default function DefectCreatePage() {
   const uploadProps = useMemo(() => ({
     multiple: false,
     maxCount: 1,
-    accept: 'image/*',
-    beforeUpload: () => false,
+    accept: 'image/png,image/jpeg',
+    beforeUpload: (file) => {
+      if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+        message.error('请上传不超过 5 MB 的 PNG 或 JPEG 图片');
+        return Upload.LIST_IGNORE;
+      }
+      return false;
+    },
     fileList,
     onChange: ({ fileList: nextFileList }) => setFileList(nextFileList.slice(-1)),
     listType: 'picture',

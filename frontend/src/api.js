@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const API = axios.create({
-  baseURL: 'http://localhost:8000',
-});
+export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL ?? `${window.location.protocol}//${window.location.hostname}:8000`;
+
+const API = axios.create({ baseURL: API_BASE_URL });
 
 const AUTH_TOKEN_KEY = 'defect-system-token';
 
@@ -90,6 +90,7 @@ export const getCurrentUser = async () => {
 
 export const changePassword = async (payload) => {
   const response = await API.put('/api/auth/password', payload);
+  setStoredToken('');
   return response.data;
 };
 

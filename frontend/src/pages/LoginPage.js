@@ -43,7 +43,7 @@ export default function LoginPage() {
           </div>
 
           <div style={{ marginBottom: 24 }}>
-            <Text type="secondary">默认管理员账号：admin / Admin@123456</Text>
+            <Text type="secondary">请使用管理员分配的账号登录</Text>
           </div>
 
           <Form form={form} layout="vertical" onFinish={handleFinish}>

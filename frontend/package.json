@@ -39,5 +39,11 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "jest": {
+    "moduleNameMapper": {
+      "^react-router-dom$": "<rootDir>/node_modules/react-router-dom/dist/index.js",
+      "^@rc-component/picker/(locale|generate)/(.*)$": "<rootDir>/node_modules/@rc-component/picker/lib/$1/$2"
+    }
   }
 }

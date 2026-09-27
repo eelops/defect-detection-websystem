@@ -4,6 +4,7 @@ import {
   Card,
   Descriptions,
   Image,
+  Form,
   Input,
   Modal,
   Select,
@@ -15,8 +16,9 @@ import {
   message,
 } from 'antd';
 import { ArrowLeftOutlined, DownloadOutlined } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
+  updateDefect,
   downloadFile,
   executeDefectAction,
   exportDefectDetailPdf,
@@ -28,6 +30,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import {
   defectActionLabels,
+  severityOptions,
   severityColorMap,
   severityLabelMap,
   statusColorMap,
@@ -49,7 +52,12 @@ const actionNeedsAcceptanceComment = (action) => ['accept', 'reject'].includes(a
 export default function DefectDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, hasRole } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [editForm] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  const editOpen = searchParams.get('edit') === '1' && hasRole('admin', 'inspector');
+  const closeEdit = () => setSearchParams({}, { replace: true });
   const [detail, setDetail] = useState(null);
   const [logs, setLogs] = useState([]);
   const [users, setUsers] = useState([]);
@@ -84,6 +92,24 @@ export default function DefectDetailPage() {
     };
     load();
   }, [loadDetail]);
+
+  useEffect(() => {
+    if (editOpen && detail) {
+      editForm.setFieldsValue({ name: detail.name, severity: detail.severity, description: detail.description || '' });
+    }
+  }, [editOpen, detail, editForm]);
+
+  const saveDetails = async (values) => {
+    setSaving(true);
+    try {
+      await updateDefect(id, values);
+      closeEdit();
+      await loadDetail();
+      message.success('缺陷信息已更新');
+    } catch (error) {
+      message.error(error?.response?.data?.detail || '保存失败');
+    } finally { setSaving(false); }
+  };
 
   const handleExportPdf = async () => {
     setExporting(true);
@@ -162,6 +188,7 @@ export default function DefectDetailPage() {
         </div>
 
         <Space wrap>
+          {hasRole('admin', 'inspector') && <Button onClick={() => setSearchParams({ edit: '1' })}>编辑信息</Button>}
           <Button icon={<DownloadOutlined />} loading={exporting} onClick={handleExportPdf}>导出 PDF 报告</Button>
           {availableActions.map((action) => (
             <Button key={action} type={['accept', 'assign', 'start_process', 'submit_for_acceptance'].includes(action) ? 'primary' : 'default'} onClick={() => openActionModal(action)}>
@@ -179,7 +206,7 @@ export default function DefectDetailPage() {
             <Descriptions.Item label="类型ID">{detail.defect_type_id || '-'}</Descriptions.Item>
             <Descriptions.Item label="等级">{severityLabelMap[detail.severity] || detail.severity || '-'}</Descriptions.Item>
             <Descriptions.Item label="状态">{statusLabelMap[detail.status] || detail.status || '-'}</Descriptions.Item>
-            <Descriptions.Item label="所属产线">{detail.production_line || '-'}</Descriptions.Item>
+            <Descriptions.Item label="所属产线">{detail.production_line_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="产线ID">{detail.production_line_id || '-'}</Descriptions.Item>
             <Descriptions.Item label="设备">{detail.equipment_name || '-'}</Descriptions.Item>
             <Descriptions.Item label="设备ID">{detail.equipment_id || '-'}</Descriptions.Item>
@@ -227,6 +254,14 @@ export default function DefectDetailPage() {
           }))}
         />
       </Card>
+
+      <Modal open={editOpen} title="编辑缺陷信息" onCancel={closeEdit} onOk={() => editForm.submit()} confirmLoading={saving} destroyOnHidden>
+        <Form form={editForm} layout="vertical" onFinish={saveDetails}>
+          <Form.Item name="name" label="标题" rules={[{ required: true, whitespace: true, message: '请输入标题' }]}><Input /></Form.Item>
+          <Form.Item name="severity" label="等级" rules={[{ required: true, message: '请选择等级' }]}><Select options={severityOptions} /></Form.Item>
+          <Form.Item name="description" label="描述"><TextArea rows={4} /></Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         open={modalOpen}
